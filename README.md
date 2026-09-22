@@ -10,6 +10,8 @@ if powershell won't run the scripts run:\
 Set-ExecutionPolicy -Scope Process -ExecutionPolicy Bypass (Note this only works in this directory)\
 Once virtual envinrontment is set up type in CLI: \
 pip install -r requirements.txt\
+\
+API endpoints path: app/api/routes\
 Starting the application:\
 pip install uv\
 uv add "fastapi[standard]"\
