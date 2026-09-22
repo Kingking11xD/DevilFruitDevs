@@ -2,6 +2,7 @@
 
 Fast Food delivery Project\
 Python Version Requirement: 3.10.3 or above\
+\
 Set up:\
 Virtual environment setup: python -m venv .venv\
 then run this
@@ -11,8 +12,8 @@ Set-ExecutionPolicy -Scope Process -ExecutionPolicy Bypass (Note this only works
 Once virtual envinrontment is set up type in CLI: \
 pip install -r requirements.txt\
 \
-API endpoints path: app/api/routes\
 Starting the application:\
+API endpoints path: app/api/routes\
 pip install uv\
 uv add "fastapi[standard]"\
 uv run fastapi dev\
