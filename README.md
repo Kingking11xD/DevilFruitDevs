@@ -16,4 +16,24 @@ uv add "fastapi[standard]"\
 uv run fastapi dev\
 go to this link http://127.0.0.1:8000 \
 for docs: http://127.0.0.1:8000/docs \
-location of representative Data: data/..jsonfiles
+location of representative Data: data/..jsonfiles\
+\
+Project Structure\
+project-root/\
+├── app/\
+│   ├── api/\
+│   │   └── routes/\
+│   ├── services/\
+│   ├── repositories/\
+│   ├── schemas/\
+│   ├── core/\
+│── main.py\
+├── data/\
+│   └── restaurants.json\
+├── tests/\
+├── scrum/\
+│   └── team-agreement.md\
+├── .gitignore\
+├── requirements.txt \
+| -pyproject.toml\
+└── README.md
