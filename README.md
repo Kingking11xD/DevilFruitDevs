@@ -1,6 +1,6 @@
 # Cosc310DevilFruitDevs
 
-Fast Food delivery Project
+Fast Food delivery Project\
 Python Version Requirement: 3.10.3\
 Set up:\
 Virtual environment setup: python -m venv .venv
