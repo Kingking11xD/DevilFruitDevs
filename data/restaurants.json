@@ -1,0 +1,12 @@
+[
+  {
+    "id": 1,
+    "name": "Pizza Mizza",
+    "cuisine": "Italian"
+  },
+  {
+    "id": 2,
+    "name": "Cantina del Centro",
+    "cuisine": "Mexican"
+  }
+]
