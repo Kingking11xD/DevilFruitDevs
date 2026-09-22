@@ -18,6 +18,8 @@ go to this link http://127.0.0.1:8000 \
 for docs: http://127.0.0.1:8000/docs \
 location of representative Data: data/..jsonfiles\
 \
+Testing: in CLI type pytest -v or just pytest -q for quick results\
+\
 Project Structure\
 project-root/\
 ├── app/\
