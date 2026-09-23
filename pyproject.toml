@@ -1,0 +1,11 @@
+[project]
+name ="DevilFruitDevs"
+version = "0.1.0"
+requires-python =">=3.10"
+dependencies  = [
+    "fastapi[standard]>=0.141.1",
+]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+pythonpath = ["."]
