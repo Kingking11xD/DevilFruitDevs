@@ -1,4 +1,4 @@
-## COSC 310 Team Agreement
+# COSC 310 Team Agreement
 
 Version: V1  
 Last updated: September 22, 2026
