@@ -13,7 +13,7 @@ As a [role], I want [capability], so that [benefit].
 ## Parent epic
 
 <!-- Add the parent issue number and set the parent relationship. -->
-<!-- Example: #5 (Restaurant discovery). -->
+<!-- Example: #5 (Restaurant discovery) -->
 
 ## Acceptance criteria
 
