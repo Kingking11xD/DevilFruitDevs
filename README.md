@@ -19,6 +19,7 @@ python -m uvicorn main:app --reload
 **API endpoints:**   
 Health check: http://127.0.0.1:8000/health  
 Restaurant list: http://127.0.0.1:8000/restaurants  
+Restaurant details: http://127.0.0.1:8000/restaurants/1
 API documentation: http://127.0.0.1:8000/docs  
 
 **Run tests from project root with the virtual environment active:**\
