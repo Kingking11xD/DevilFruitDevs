@@ -5,7 +5,7 @@ from time import sleep
 
 import pytest
 
-from app.repositories.json_store import read_records, update_records
+from app.repositories.json_store import data_path, read_records, update_records
 from app.repositories.restaurant_repo import RestaurantRepo
 
 
@@ -109,3 +109,9 @@ def test_concurrent_updates(tmp_path: Path) -> None:
 
     records = read_records(path)
     assert sorted(record["id"] for record in records) == [1, 2]  # Neither update was lost
+
+
+def test_data_path(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setenv("DATA_DIR", str(tmp_path))
+
+    assert data_path("restaurants.json") == tmp_path / "restaurants.json"
