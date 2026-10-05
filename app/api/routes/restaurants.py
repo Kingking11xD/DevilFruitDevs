@@ -16,7 +16,7 @@ service = RestaurantService(repository)
         "/restaurants",
         response_model=list[Restaurant],
         summary="List restaurants",
-        description="Return a list of all available restaurants"
+        description="Return all restaurants, optionally filtered by name using the search parameter"
 )
 def get_restaurants(
     search: Annotated[
