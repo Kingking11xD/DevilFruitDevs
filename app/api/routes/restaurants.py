@@ -12,7 +12,12 @@ repository = RestaurantRepo("data/restaurants.json")
 service = RestaurantService(repository)
 
 
-@router.get("/restaurants", response_model=list[Restaurant])
+@router.get(
+        "/restaurants",
+        response_model=list[Restaurant],
+        summary="List restaurants",
+        description="Return a list of all available restaurants"
+)
 def get_restaurants() -> list[dict[str, Any]]:
     return service.get_all_restaurants()
 
