@@ -6,3 +6,4 @@
 | epic.md | `.github/ISSUE_TEMPLATE/epic.md` | Codex drafted the template based on Lecture 6. |
 | user_story.md | `.github/ISSUE_TEMPLATE/user_story.md` | Codex drafted the template based on Lecture 6. |
 | task.md | `.github/ISSUE_TEMPLATE/task.md` | Codex drafted the template based on Lecture 6. |
+| test_repositories.py | `tests/test_repositories.py` | Codex assisted with writing four added tests relating to json |

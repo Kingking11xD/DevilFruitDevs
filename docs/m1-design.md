@@ -1,7 +1,7 @@
 # M1 Design
 
 Version: V1  
-Last updated: September 30, 2026
+Last updated: October 5, 2026
 
 > **Draft for team review:** This document proposes our M1 design and can be updated as needed. It is separate from the course-required Decision Receipt.
 
@@ -59,8 +59,8 @@ Follow **Routes -> Services -> Repositories -> JSON**: routes handle HTTP, schem
 
 - Use `data/restaurants.json` and `data/menu_items.json`, each containing a list of records. Make the data folder configurable and independent of the launch directory.
 - Keenan provides shared JSON reading/saving. Keep restaurant listing compatible; add lookup/create/update methods.
-- Lock each file while reading, changing, and saving it. Write a temporary file beside the original, then replace the original only after writing succeeds. Preserve old data if saving fails. Use UTF-8 and two-space indentation.
-- Run one backend process. Locks do not protect against external edits or cloud-sync conflicts; avoid those while running. Saves across both files are not one transaction.
+- Use one shared storage lock for all JSON reads and updates. Hold it for the complete read-change-save operation. Restaurant and menu operations take turns, keeping the implementation simple. Write a temporary file beside the original, then replace the original only after writing succeeds. Preserve old data if saving fails. Use UTF-8 and two-space indentation.
+- Run one backend process. The lock does not protect against other processes, external edits, or cloud-sync conflicts; avoid those while running. Saves across both files are not one transaction. Change functions only modify the supplied records; they must not call storage functions again while holding the lock.
 - Missing or corrupt required files must produce an error. Never silently reset data or overwrite it at startup. An intentionally empty menu file contains `[]`.
 - Add sample addresses to existing restaurant records without changing their IDs.
 
