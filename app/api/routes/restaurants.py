@@ -1,6 +1,6 @@
 from typing import Annotated, Any
 
-from fastapi import APIRouter, HTTPException, Path
+from fastapi import APIRouter, HTTPException, Path, Query
 
 from app.repositories.restaurant_repo import RestaurantRepo
 from app.schemas.restaurant import Restaurant
@@ -18,9 +18,14 @@ service = RestaurantService(repository)
         summary="List restaurants",
         description="Return a list of all available restaurants"
 )
-def get_restaurants() -> list[dict[str, Any]]:
-    return service.get_all_restaurants()
-
+def get_restaurants(
+    search: Annotated[
+        str | None,
+        Query(description="Search restaurants by name"),
+    ] = None,
+) -> list[dict[str, Any]]:
+    """Return restaurants that match the optional name search"""
+    return service.get_all_restaurants(search)
 
 @router.get(
     "/restaurants/{restaurant_id}",
