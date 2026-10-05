@@ -35,6 +35,39 @@ def test_restaurants(tmp_path, monkeypatch):
     assert response.status_code == 200
     assert response.json() == expected
 
+def test_restaurants_empty(tmp_path, monkeypatch):
+    """Test that an empty restaurant file returns an empty list"""
+    temp_path = tmp_path / "restaurants.json"
+    temp_path.write_text("[]", encoding="utf-8")
+
+    monkeypatch.setattr(restaurants.repository, "file_path", temp_path)
+
+    response = client.get("/restaurants")
+
+    assert response.status_code == 200
+    assert response.json() == []
+
+def test_restaurants_does_not_modify_data(tmp_path, monkeypatch):
+    """Test that retrieving restaurants does not modify the saved data"""
+    data = [
+        {
+            "id": 1,
+            "name": "Kebab",
+            "cuisine": "Turkish",
+            "address": "123 Main Rd"
+        }
+    ]
+
+    temp_path = tmp_path / "restaurants.json"
+    temp_path.write_text(json.dumps(data), encoding="utf-8")
+    before = temp_path.read_bytes()
+
+    monkeypatch.setattr(restaurants.repository, "file_path", temp_path)
+
+    response = client.get("/restaurants")
+
+    assert response.status_code == 200
+    assert temp_path.read_bytes() == before
 
 def test_restaurant_details(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
     data = [
