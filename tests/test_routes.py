@@ -69,6 +69,87 @@ def test_restaurants_does_not_modify_data(tmp_path, monkeypatch):
     assert response.status_code == 200
     assert temp_path.read_bytes() == before
 
+@pytest.mark.parametrize(
+    ("search", "expected_names"),
+    [
+        ("Sushi", ["Sushi"]),
+        ("su", ["Sushi"]),
+        ("SUSHI", ["Sushi"]),
+        ("  sushi   ", ["Sushi"]),
+        ("pizza", []),
+    ],
+)
+def test_search_restaurants(
+    tmp_path,
+    monkeypatch,
+    search,
+    expected_names,
+):
+    """Test restaurant name search with different search terms"""
+    data = [
+        {
+            "id": 1,
+            "name": "Sushi",
+            "cuisine": "Japanese",
+            "address": "310 Science Rd",
+        },
+        {
+            "id": 2,
+            "name": "Bulgogi House",
+            "cuisine": "Korean",
+            "address": "105 Arts Rd",
+        },
+        {
+            "id": 3,
+            "name": "Burger King",
+            "cuisine": "American",
+            "address": "99 Avenue Rd",
+        },
+    ]
+
+    temp_path = tmp_path / "restaurants.json"
+    temp_path.write_text(json.dumps(data), encoding="utf-8")
+
+    monkeypatch.setattr(restaurants.repository, "file_path", temp_path)
+
+    response = client.get("/restaurants", params={"search": search})
+
+    assert response.status_code == 200
+    assert [restaurant["name"] for restaurant in response.json()] == expected_names
+
+def test_blank_restaurant_search(tmp_path, monkeypatch):
+    """Test that a blank search returns all restaurants"""
+    data = [
+        {
+            "id": 1,
+            "name": "Sushi",
+            "cuisine": "Japanese",
+            "address": "310 Science Rd",
+        },
+        {
+            "id": 2,
+            "name": "Bulgogi House",
+            "cuisine": "Korean",
+            "address": "105 Arts Rd",
+        },
+        {
+            "id": 3,
+            "name": "Burger King",
+            "cuisine": "American",
+            "address": "99 Avenue Rd",
+        },
+    ]
+
+    temp_path = tmp_path / "restaurants.json"
+    temp_path.write_text(json.dumps(data), encoding="utf-8")
+
+    monkeypatch.setattr(restaurants.repository, "file_path", temp_path)
+
+    response = client.get("/restaurants", params={"search": "   "})
+
+    assert response.status_code == 200
+    assert response.json() == data 
+
 def test_restaurant_details(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
     data = [
         {"id": 1, "name": "Kebab", "cuisine": "Turkish", "address": "120 Lovely Rd"},
