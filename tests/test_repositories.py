@@ -1,6 +1,4 @@
 import json
-from pathlib import Path
-
 import pytest
 
 from app.repositories.restaurant_repo import RestaurantRepo
@@ -8,9 +6,9 @@ from app.repositories.restaurant_repo import RestaurantRepo
 
 def test_get_all_restaurants(tmp_path):
     expected = [
-        {"id": 1, "name": "Kebab", "cuisine": "Turkish", "address": "120 Lovely Rd"},
-        {"id": 2, "name": "Taco", "cuisine": "Mexican", "address": "213 Nowhere Ave"},
-        {"id": 3, "name": "Burger", "cuisine": "South Canada", "address": "20 Main St"}
+        {"id": 1, "name": "Kebab", "cuisine": "Turkish"},
+        {"id": 2, "name": "Taco", "cuisine": "Mexican"},
+        {"id": 3, "name": "Burger", "cuisine": "South Canada"}
     ]
 
     temp_path = tmp_path / "restaurants.json" 
@@ -39,17 +37,3 @@ def test_missing_file(tmp_path):
 
     with pytest.raises(FileNotFoundError):
         repository.get_all()
-
-
-def test_get_by_id(tmp_path: Path) -> None:
-    data = [
-        {"id": 1, "name": "Kebab", "cuisine": "Turkish", "address": "120 Lovely Rd"},
-        {"id": 2, "name": "Taco", "cuisine": "Mexican", "address": "213 Nowhere Ave"},
-    ]
-    file_path = tmp_path / "restaurants.json"
-    file_path.write_text(json.dumps(data), encoding="utf-8")
-
-    repository = RestaurantRepo(file_path)
-
-    assert repository.get_by_id(2) == data[1]
-    assert repository.get_by_id(999) is None

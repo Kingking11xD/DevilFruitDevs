@@ -2,13 +2,11 @@
   {
     "id": 1,
     "name": "Pizza Mizza",
-    "cuisine": "Italian",
-    "address": "42 Pepperoni Lane"
+    "cuisine": "Italian"
   },
   {
     "id": 2,
     "name": "Cantina del Centro",
-    "cuisine": "Mexican",
-    "address": "9001 Vegeta Drive"
+    "cuisine": "Mexican"
   }
 ]
