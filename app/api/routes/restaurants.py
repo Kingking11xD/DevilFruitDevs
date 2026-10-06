@@ -23,9 +23,13 @@ def get_restaurants(
         str | None,
         Query(description="Search restaurants by name"),
     ] = None,
+    cuisine: Annotated[
+        str | None,
+        Query(description="Filter restaurants by cuisine"),
+    ] = None,
 ) -> list[dict[str, Any]]:
-    """Return restaurants that match the optional name search"""
-    return service.get_all_restaurants(search)
+    """Return restaurants that match the optional search and cuisine filters"""
+    return service.get_all_restaurants(search=search, cuisine=cuisine)
 
 @router.get(
     "/restaurants/{restaurant_id}",
