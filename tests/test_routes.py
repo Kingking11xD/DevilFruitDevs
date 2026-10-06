@@ -3,7 +3,7 @@ from pathlib import Path
 
 import pytest
 from fastapi.testclient import TestClient
-
+from app.api.routes import menu
 from app.api.routes import restaurants
 from main import app
 
@@ -190,3 +190,82 @@ def test_invalid_restaurant_id(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) 
     for restaurant_id in ["abc", "0", "-1"]:
         response = client.get(f"/restaurants/{restaurant_id}")
         assert response.status_code == 422, f"Failed for ID: {restaurant_id}"
+
+
+def test_restaurant_menu(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    restaurant_data = [
+        {
+            "id": 1,
+            "name": "Pizza Mizza",
+            "cuisine": "Italian",
+            "address": "42 Pepperoni Lane",
+        }
+    ]
+
+    menu_data = [
+        {
+            "id": 2,
+            "restaurant_id": 1,
+            "name": "Pepperoni Pizza",
+            "price": 17.99,
+            "available": True,
+        },
+        {
+            "id": 1,
+            "restaurant_id": 1,
+            "name": "Margherita Pizza",
+            "price": 15.99,
+            "available": True,
+        },
+        {
+            "id": 3,
+            "restaurant_id": 1,
+            "name": "Garlic Bread",
+            "price": 7.99,
+            "available": False,
+        },
+    ]
+
+    restaurant_path = tmp_path / "restaurants.json"
+    restaurant_path.write_text(
+        json.dumps(restaurant_data),
+        encoding="utf-8",
+    )
+
+    menu_path = tmp_path / "menu_items.json"
+    menu_path.write_text(
+        json.dumps(menu_data),
+        encoding="utf-8",
+    )
+
+    monkeypatch.setattr(
+        menu.restaurant_repository,
+        "file_path",
+        restaurant_path,
+    )
+
+    monkeypatch.setattr(
+        menu.menu_repository,
+        "file_path",
+        menu_path,
+    )
+
+    response = client.get("/restaurants/1/menu")
+
+    assert response.status_code == 200
+    assert [item["id"] for item in response.json()] == [1, 2, 3]
+    assert response.json()[2]["available"] is False
+
+    @pytest.mark.parametrize(
+    "restaurant_id",
+    ["abc", "0", "-1"],
+)
+    
+    def test_invalid_menu_restaurant_id(
+        restaurant_id,
+    ) -> None:
+        response = client.get(
+            f"/restaurants/{restaurant_id}/menu"
+        )
+
+        assert response.status_code == 422

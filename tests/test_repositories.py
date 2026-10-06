@@ -4,6 +4,7 @@ from pathlib import Path
 import pytest
 
 from app.repositories.restaurant_repo import RestaurantRepo
+from app.repositories.menu_repo import MenuRepo
 
 
 def test_get_all_restaurants(tmp_path):
@@ -53,3 +54,37 @@ def test_get_by_id(tmp_path: Path) -> None:
 
     assert repository.get_by_id(2) == data[1]
     assert repository.get_by_id(999) is None
+
+def test_get_menu_by_restaurant_id(tmp_path: Path) -> None:
+    data = [
+        {
+            "id": 1,
+            "restaurant_id": 1,
+            "name": "Margherita Pizza",
+            "price": 15.99,
+            "available": True,
+        },
+        {
+            "id": 2,
+            "restaurant_id": 2,
+            "name": "Tacos al Pastor",
+            "price": 13.99,
+            "available": True,
+        },
+        {
+            "id": 3,
+            "restaurant_id": 1,
+            "name": "Garlic Bread",
+            "price": 7.99,
+            "available": False,
+        },
+    ]
+
+    file_path = tmp_path / "menu_items.json"
+    file_path.write_text(json.dumps(data), encoding="utf-8")
+
+    repository = MenuRepo(file_path)
+
+    result = repository.get_by_restaurant_id(1)
+
+    assert result == [data[0], data[2]]

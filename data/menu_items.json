@@ -1,0 +1,37 @@
+[
+    {
+        "id": 1,
+        "restaurant_id": 1,
+        "name": "Margherita Pizza",
+        "price": 15.99,
+        "available": true
+    },
+    {
+        "id": 2,
+        "restaurant_id": 1,
+        "name": "Pepperoni Pizza",
+        "price": 17.99,
+        "available": true
+    },
+    {
+        "id": 3,
+        "restaurant_id": 1,
+        "name": "Garlic Bread",
+        "price": 7.99,
+        "available": false
+    },
+    {
+        "id": 4,
+        "restaurant_id": 2,
+        "name": "Tacos al Pastor",
+        "price": 13.99,
+        "available": true
+    },
+    {
+        "id": 5,
+        "restaurant_id": 2,
+        "name": "Burrito",
+        "price": 14.99,
+        "available": true
+    }
+]
