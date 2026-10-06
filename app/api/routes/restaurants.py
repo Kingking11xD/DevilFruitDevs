@@ -8,7 +8,7 @@ from app.services.restaurant_service import RestaurantNotFoundError, RestaurantS
 
 router = APIRouter()
 
-repository = RestaurantRepo("data/restaurants.json")
+repository = RestaurantRepo()
 service = RestaurantService(repository)
 
 

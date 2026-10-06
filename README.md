@@ -22,6 +22,10 @@ Restaurant list: http://127.0.0.1:8000/restaurants
 Restaurant details: http://127.0.0.1:8000/restaurants/1
 API documentation: http://127.0.0.1:8000/docs  
 
+**Data storage:**  
+Data defaults to `data/restaurants.json`. To change the folder before starting the app:  
+$env:DATA_DIR = "C:\path\to\data"
+
 **Run tests from project root with the virtual environment active:**\
 python -m pytest -v
 

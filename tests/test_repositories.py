@@ -1,8 +1,11 @@
 import json
+from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
+from time import sleep
 
 import pytest
 
+from app.repositories.json_store import data_path, read_records, update_records
 from app.repositories.restaurant_repo import RestaurantRepo
 
 
@@ -53,3 +56,62 @@ def test_get_by_id(tmp_path: Path) -> None:
 
     assert repository.get_by_id(2) == data[1]
     assert repository.get_by_id(999) is None
+
+
+def test_save_records(tmp_path: Path) -> None:
+    path = tmp_path / "restaurants.json"
+    path.write_text('[{"id": 1}]', encoding="utf-8")  # Start with one saved record
+
+    def add_restaurant(records: list[dict]) -> None:
+        records.append({"id": 2})
+
+    update_records(path, add_restaurant)  # Add and save the new record
+
+    assert read_records(path) == [{"id": 1}, {"id": 2}]  # Both records are still there
+
+
+def test_invalid_structure(tmp_path: Path) -> None:
+    path = tmp_path / "restaurants.json"
+    path.write_text("{}", encoding="utf-8")  # Valid json but not a list
+
+    with pytest.raises(ValueError):
+        read_records(path)
+
+
+def test_failed_save_keeps_data(tmp_path: Path) -> None:
+    path = tmp_path / "restaurants.json"
+    path.write_text('[{"id": 1}]', encoding="utf-8")
+    before = path.read_bytes()  # Keep the original contents to compare
+
+    def add_invalid_record(records: list[dict]) -> None:
+        records.append({"value": object()})  # cannot be saved as json
+
+    with pytest.raises(TypeError):
+        update_records(path, add_invalid_record)
+
+    assert path.read_bytes() == before  # Original data unchanged
+    assert list(tmp_path.iterdir()) == [path]  # No temporary file left
+
+
+def test_concurrent_updates(tmp_path: Path) -> None:
+    path = tmp_path / "restaurants.json"
+    path.write_text("[]", encoding="utf-8")
+
+    def add_restaurant(number: int) -> None:
+        def change(records: list[dict]) -> None:
+            sleep(0.01)  # Give other updates time to overlap
+            records.append({"id": number})
+
+        update_records(path, change)
+
+    with ThreadPoolExecutor(max_workers=2) as workers:
+        list(workers.map(add_restaurant, [1, 2]))  # Run both updates
+
+    records = read_records(path)
+    assert sorted(record["id"] for record in records) == [1, 2]  # Neither update was lost
+
+
+def test_data_path(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setenv("DATA_DIR", str(tmp_path))
+
+    assert data_path("restaurants.json") == tmp_path / "restaurants.json"
