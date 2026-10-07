@@ -150,158 +150,103 @@ def test_blank_restaurant_search(tmp_path, monkeypatch):
     assert response.status_code == 200
     assert response.json() == data
 
+CUISINE_DATA = [
+    {
+        "id": 1,
+        "name": "Sushi",
+        "cuisine": "Japanese",
+        "address": "310 Science Rd",
+    },
+    {
+        "id": 2,
+        "name": "Bulgogi House",
+        "cuisine": "Korean",
+        "address": "105 Arts Rd",
+    },
+    {
+        "id": 3,
+        "name": "Burger King",
+        "cuisine": "American",
+        "address": "99 Avenue Rd",
+    },
+    {
+        "id": 4,
+        "name": "Seoul Kitchen",
+        "cuisine": "Korean",
+        "address": "12 Main Mall",
+    },
+]
+
+@pytest.fixture
+def cuisine_data(tmp_path, monkeypatch):
+    """Point the restaurant repository at sample restaurant data"""
+    temp_path = tmp_path / "restaurants.json"
+    temp_path.write_text(json.dumps(CUISINE_DATA), encoding="utf-8")
+
+    monkeypatch.setattr(restaurants.repository, "file_path", temp_path)
+
 @pytest.mark.parametrize(
-    ("cuisine", "expected_names"),
+    ("params", "expected_names"),
     [
-        ("Korean", ["Bulgogi House"]),
-        ("korean", ["Bulgogi House"]),
-        ("  KOREAN  ", ["Bulgogi House"]),
-        ("Kor", []),
-        ("Italian", []),
+        pytest.param(
+            {"cuisine": "Japanese"},
+            ["Sushi"],
+            id="exact-match",
+        ),
+        pytest.param(
+            {"cuisine": "japanese"},
+            ["Sushi"],
+            id="case-insensitive",
+        ),
+        pytest.param(
+            {"cuisine": "   JAPANESE    "},
+            ["Sushi"],
+            id="surrounding-spaces",
+        ),
+        pytest.param(
+            {"cuisine": "Kor"},
+            [],
+            id="partial-does-not-match",
+        ),
+        pytest.param(
+            {"cuisine": "Italian"},
+            [],
+            id="unknown-cuisine",
+        ),
+        pytest.param(
+            {"cuisine": "Korean"},
+            ["Bulgogi House", "Seoul Kitchen"],
+            id="same-cuisine-all-returned",
+        ),
+        pytest.param(
+            {"cuisine": "   "},
+            ["Sushi", "Bulgogi House", "Burger King", "Seoul Kitchen"],
+            id="blank-returns-all",
+        ),
+        pytest.param(
+            {"search": "bu", "cuisine": "korean"},
+            ["Bulgogi House"],
+            id="search-and-cuisine",
+        ),
+        pytest.param(
+            {"search": "Sushi", "cuisine": "Korean"},
+            [],
+            id="both-filters-must-match",
+        ),
     ],
 )
 def test_filter_restaurants_by_cuisine(
-    tmp_path,
-    monkeypatch,
-    cuisine,
+    cuisine_data,
+    params,
     expected_names,
 ):
-    """Test restaurant cuisine filtering with different cuisine values"""
-    data = [
-        {
-            "id": 1,
-            "name": "Sushi",
-            "cuisine": "Japanese",
-            "address": "310 Science Rd",
-        },
-        {
-            "id": 2,
-            "name": "Bulgogi House",
-            "cuisine": "Korean",
-            "address": "105 Arts Rd",
-        },
-        {
-            "id": 3,
-            "name": "Burger King",
-            "cuisine": "American",
-            "address": "99 Avenue Rd",
-        },
-    ]
-
-    temp_path = tmp_path / "restaurants.json"
-    temp_path.write_text(json.dumps(data), encoding="utf-8")
-
-    monkeypatch.setattr(restaurants.repository, "file_path", temp_path)
-
-    response = client.get("/restaurants", params={"cuisine": cuisine})
+    """Test cuisine filtering on its own and with name search"""
+    response = client.get("/restaurants", params=params)
 
     assert response.status_code == 200
-    assert [restaurant["name"] for restaurant in response.json()] == expected_names
-
-def test_blank_cuisine_filter(tmp_path, monkeypatch):
-    """Test that a blank cuisine filter returns all restaurants"""
-    data = [
-        {
-            "id": 1,
-            "name": "Sushi",
-            "cuisine": "Japanese",
-            "address": "310 Science Rd",
-        },
-        {
-            "id": 2,
-            "name": "Bulgogi House",
-            "cuisine": "Korean",
-            "address": "105 Arts Rd",
-        },
-        {
-            "id": 3,
-            "name": "Burger King",
-            "cuisine": "American",
-            "address": "99 Avenue Rd",
-        },
-    ]
-
-    temp_path = tmp_path / "restaurants.json"
-    temp_path.write_text(json.dumps(data), encoding="utf-8")
-
-    monkeypatch.setattr(restaurants.repository, "file_path", temp_path)
-
-    response = client.get("/restaurants", params={"cuisine": "   "})
-
-    assert response.status_code == 200
-    assert response.json() == data
-
-def test_search_and_cuisine_filter(tmp_path, monkeypatch):
-    """Test that search and cuisine filters work together"""
-    data = [
-        {
-            "id": 1,
-            "name": "Sushi",
-            "cuisine": "Japanese",
-            "address": "310 Science Rd",
-        },
-        {
-            "id": 2,
-            "name": "Bulgogi House",
-            "cuisine": "Korean",
-            "address": "105 Arts Rd",
-        },
-        {
-            "id": 3,
-            "name": "Burger King",
-            "cuisine": "American",
-            "address": "99 Avenue Rd",
-        },
-    ]
-
-    temp_path = tmp_path / "restaurants.json"
-    temp_path.write_text(json.dumps(data), encoding="utf-8")
-
-    monkeypatch.setattr(restaurants.repository, "file_path", temp_path)
-
-    response = client.get(
-        "/restaurants",
-        params={"search": "Sushi", "cuisine": "Japanese"},
-    )
-
-    assert response.status_code == 200
-    assert response.json() == [data[0]]
-
-def test_search_and_cuisine_filter_no_match(tmp_path, monkeypatch):
-    """Test that both search and cuisine filters must match"""
-    data = [
-        {
-            "id": 1,
-            "name": "Sushi",
-            "cuisine": "Japanese",
-            "address": "310 Science Rd",
-        },
-        {
-            "id": 2,
-            "name": "Bulgogi House",
-            "cuisine": "Korean",
-            "address": "105 Arts Rd",
-        },
-        {
-            "id": 3,
-            "name": "Burger King",
-            "cuisine": "American",
-            "address": "99 Avenue Rd",
-        },
-    ]
-
-    temp_path = tmp_path / "restaurants.json"
-    temp_path.write_text(json.dumps(data), encoding="utf-8")
-
-    monkeypatch.setattr(restaurants.repository, "file_path", temp_path)
-
-    response = client.get(
-        "/restaurants",
-        params={"search": "Sushi", "cuisine": "Korean"},
-    )
-
-    assert response.status_code == 200
-    assert response.json() == []
+    assert [
+        restaurant["name"] for restaurant in response.json()
+    ] == expected_names
 
 def test_restaurant_details(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
     data = [
