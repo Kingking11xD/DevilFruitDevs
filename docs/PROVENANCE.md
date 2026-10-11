@@ -7,4 +7,5 @@
 | user_story.md | `.github/ISSUE_TEMPLATE/user_story.md` | Codex drafted the template based on Lecture 6. |
 | task.md | `.github/ISSUE_TEMPLATE/task.md` | Codex drafted the template based on Lecture 6. |
 | test_repositories.py | `tests/test_repositories.py` | Codex assisted with writing four added tests relating to json. |
-| test_create_restaurant.py | `tests/test_create_restaurant.py` | Codex assisted with writing three tests relating to restaurant creation |
+| test_create_restaurant.py | `tests/test_create_restaurant.py` | Codex assisted with writing three tests relating to restaurant creation. |
+| test_update_restaurant.py | `tests/test_update_restaurant.py` | Codex assisted with writing three tests relating to restaurant updating. |

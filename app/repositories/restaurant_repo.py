@@ -8,6 +8,10 @@ from app.repositories.json_store import (
 )
 
 
+class RestaurantMissingError(Exception):
+    """The restaurant to update was not found."""
+
+
 class RestaurantRepo:
 
     def __init__(self, file_path: str | Path | None = None) -> None:
@@ -46,3 +50,16 @@ class RestaurantRepo:
             return new_restaurant
 
         return update_records(self.file_path, add_restaurant)
+
+    def update(self, restaurant_id: int, changes: dict[str, Any]) -> dict[str, Any]:
+        def change_restaurant(records: list[dict]) -> dict[str, Any]:
+            for restaurant in records:
+                if restaurant["id"] == restaurant_id:
+                    for field, value in changes.items():
+                        restaurant[field] = value
+
+                    return restaurant
+
+            raise RestaurantMissingError("Restaurant not found")
+
+        return update_records(self.file_path, change_restaurant)

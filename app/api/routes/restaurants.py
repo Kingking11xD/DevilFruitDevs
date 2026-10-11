@@ -3,7 +3,7 @@ from typing import Annotated, Any
 from fastapi import APIRouter, HTTPException, Path, Query
 
 from app.repositories.restaurant_repo import RestaurantRepo
-from app.schemas.restaurant import Restaurant, RestaurantCreate
+from app.schemas.restaurant import Restaurant, RestaurantCreate, RestaurantUpdate
 from app.services.restaurant_service import RestaurantNotFoundError, RestaurantService
 
 router = APIRouter()
@@ -74,4 +74,37 @@ def create_restaurant(data: RestaurantCreate) -> dict[str, Any]:
         raise HTTPException(
             status_code=500,
             detail="Restaurant data could not be saved",
+        ) from error
+
+@router.patch(
+    "/restaurants/{restaurant_id}",
+    response_model=Restaurant,
+    summary="Update a restaurant",
+    description=(
+        "Update fields and return the saved restaurant. "
+        "Missing fields stay unchanged. "
+        "Empty updates and null values are rejected."
+    ),
+    responses={
+        404: {"description": "Restaurant not found"},
+        422: {"description": "Invalid restaurant information"},
+        500: {"description": "Restaurant data not saved"},
+    },
+)
+def update_restaurant(
+    restaurant_id: Annotated[int, Path(gt=0, description="The restaurant's INT ID")],
+    data: RestaurantUpdate) -> dict[str, Any]:
+    changes = data.model_dump(exclude_unset=True)
+
+    try:
+        return service.update_restaurant(restaurant_id, changes)
+    except RestaurantNotFoundError as error:
+        raise HTTPException(
+            status_code=404,
+            detail=str(error),
+        ) from error
+    except (OSError, ValueError) as error:
+        raise HTTPException(
+            status_code=500,
+            detail="Restaurant data not saved",
         ) from error
