@@ -31,7 +31,7 @@ class RestaurantRepo:
         def add_restaurant(records: list[dict]) -> dict[str, Any]:
             next_id = 1
 
-            for restaurant in records:
+            for restaurant in records: # Find the next available restaurant ID
                 if restaurant["id"] >= next_id:
                     next_id = restaurant["id"] + 1
 
