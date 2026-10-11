@@ -3,7 +3,7 @@ from typing import Annotated, Any
 from fastapi import APIRouter, HTTPException, Path, Query
 
 from app.repositories.restaurant_repo import RestaurantRepo
-from app.schemas.restaurant import Restaurant
+from app.schemas.restaurant import Restaurant, RestaurantCreate
 from app.services.restaurant_service import RestaurantNotFoundError, RestaurantService
 
 router = APIRouter()
@@ -13,10 +13,10 @@ service = RestaurantService(repository)
 
 
 @router.get(
-        "/restaurants",
-        response_model=list[Restaurant],
-        summary="List restaurants",
-        description="Return all restaurants, optionally filtered by name and cuisine"
+    "/restaurants",
+    response_model=list[Restaurant],
+    summary="List restaurants",
+    description="Return all restaurants, optionally filtered by name and cuisine"
 )
 def get_restaurants(
     search: Annotated[
@@ -50,4 +50,28 @@ def get_restaurant(
         raise HTTPException(
             status_code=404,
             detail=str(error),
+        ) from error
+
+@router.post(
+    "/restaurants",
+    response_model=Restaurant,
+    status_code=201,
+    summary="Create a restaurant",
+    description="Save a restaurant with a server-assigned ID.",
+    responses={
+        422: {"description": "Invalid restaurant information"},
+        500: {"description": "Restaurant data could not be saved"},
+    },
+)
+def create_restaurant(data: RestaurantCreate) -> dict[str, Any]:
+    try:
+        return service.create_restaurant(
+            data.name,
+            data.cuisine,
+            data.address,
+        )
+    except (OSError, ValueError) as error:
+        raise HTTPException(
+            status_code=500,
+            detail="Restaurant data could not be saved",
         ) from error

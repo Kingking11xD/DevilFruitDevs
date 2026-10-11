@@ -41,3 +41,6 @@ class RestaurantService:
             raise RestaurantNotFoundError("Restaurant not found")
 
         return restaurant
+
+    def create_restaurant(self, name: str, cuisine: str, address: str) -> dict[str, Any]:
+        return self.repository.create(name, cuisine, address)
