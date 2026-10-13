@@ -117,3 +117,13 @@ def test_menu_repo_default_path_uses_data_dir(
     monkeypatch.setenv("DATA_DIR", str(tmp_path))
 
     assert MenuRepo().file_path == tmp_path / "menu_items.json"
+
+def test_menu_repo_create_assigns_next_id(tmp_path):
+    path = tmp_path / "menu_items.json"
+    path.write_text("[]")
+    repo = MenuRepo(path)
+    first = repo.create(1, {"name": "Soup", "price": 500, "available": True})
+    second = repo.create(2, {"name": "Tea", "price": 200, "available": True})
+    assert first["id"] == 1
+    assert second["id"] == 2
+    assert len(repo.get_all()) == 2

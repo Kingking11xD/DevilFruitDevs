@@ -138,3 +138,8 @@ def test_get_menu_item_from_another_restaurant() -> None:
     # Item 2 exists, but it belongs to restaurant 2
     with pytest.raises(MenuItemNotFoundError):
         make_menu_item_service().get_menu_item(1, 2)
+
+def test_add_menu_item_unknown_restaurant_raises():
+    service = make_menu_item_service()
+    with pytest.raises(RestaurantNotFoundError):
+        service.add_menu_item(999, {"name": "X", "price": 100, "available": True})

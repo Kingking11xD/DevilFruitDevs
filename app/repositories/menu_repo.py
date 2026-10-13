@@ -1,7 +1,7 @@
 from pathlib import Path
 from typing import Any
 
-from app.repositories.json_store import data_path, read_records
+from app.repositories.json_store import data_path, read_records, update_records
 
 
 class MenuRepo:
@@ -29,3 +29,12 @@ class MenuRepo:
             for item in self.get_all()
             if item["restaurant_id"] == restaurant_id
         ]
+
+    def create(self, restaurant_id: int, data: dict[str, Any]) -> dict[str, Any]:
+        def add(records: list[dict]) -> dict[str, Any]:
+            new_id = max((r["id"] for r in records), default=0) + 1
+            item = {"id": new_id, "restaurant_id": restaurant_id, **data}
+            records.append(item)
+            return item
+
+        return update_records(self.file_path, add)

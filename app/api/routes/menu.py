@@ -1,10 +1,10 @@
 from typing import Annotated, Any
 
-from fastapi import APIRouter, HTTPException, Path
+from fastapi import APIRouter, HTTPException, Path, status
 
 from app.api.routes.restaurants import repository as restaurant_repository
 from app.repositories.menu_repo import MenuRepo
-from app.schemas.menu import MenuItem
+from app.schemas.menu import MenuItem, MenuItemCreate
 from app.services.menu_service import MenuItemNotFoundError, MenuService
 from app.services.restaurant_service import RestaurantNotFoundError
 
@@ -75,3 +75,19 @@ def get_menu_item(
             status_code=404,
             detail=str(error),
         ) from error
+
+@router.post(
+    "/restaurants/{restaurant_id}/menu-items",
+    response_model=MenuItem,
+    status_code=status.HTTP_201_CREATED,
+    summary="Add a menu item",
+    responses={404: {"description": "Restaurant not found"}},
+)
+def add_menu_item(
+    restaurant_id: Annotated[int, Path(gt=0)],
+    body: MenuItemCreate,
+) -> dict:
+    try:
+        return service.add_menu_item(restaurant_id, body.model_dump())
+    except RestaurantNotFoundError:
+        raise HTTPException(status_code=404, detail="Restaurant not found")

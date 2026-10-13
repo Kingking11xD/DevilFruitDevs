@@ -377,3 +377,31 @@ def test_menu_item_does_not_modify_data(tmp_path, menu_item_files) -> None:
     client.get("/restaurants/1/menu-items/1")
 
     assert Path(menu_path).read_bytes() == before
+
+def test_add_menu_item(menu_item_files):
+    response = client.post(
+        "/restaurants/1/menu-items",
+        json={"name": "Calzone", "price": 1700},
+    )
+    assert response.status_code == 201
+    body = response.json()
+    assert body["restaurant_id"] == 1
+    assert body["name"] == "Calzone"
+    assert body["available"] is True
+    assert client.get(f"/restaurants/1/menu-items/{body['id']}").status_code == 200
+
+
+def test_add_menu_item_unknown_restaurant(menu_item_files):
+    response = client.post("/restaurants/999/menu-items", json={"name": "X", "price": 100})
+    assert response.status_code == 404
+
+
+@pytest.mark.parametrize("body", [
+    {},
+    {"name": "", "price": 100},
+    {"name": "X", "price": 0},
+    {"name": "X", "price": -5},
+    {"name": "X", "price": "abc"},
+])
+def test_add_menu_item_invalid_body(menu_item_files, body):
+    assert client.post("/restaurants/1/menu-items", json=body).status_code == 422

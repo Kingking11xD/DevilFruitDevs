@@ -47,3 +47,8 @@ class MenuService:
             raise MenuItemNotFoundError("Menu item not found")
 
         return item
+
+    def add_menu_item(self, restaurant_id: int, data: dict) -> dict:
+        if self.restaurant_repository.get_by_id(restaurant_id) is None:
+            raise RestaurantNotFoundError
+        return self.menu_repository.create(restaurant_id, data)
