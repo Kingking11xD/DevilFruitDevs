@@ -4,8 +4,10 @@ from app.repositories.menu_repo import MenuRepo
 from app.repositories.restaurant_repo import RestaurantRepo
 from app.services.restaurant_service import RestaurantNotFoundError
 
-class MenuService:
+class MenuItemNotFoundError(Exception):
+    """The requested menu item does not exist for that restaurant."""
 
+class MenuService:
     def __init__(
         self,
         menu_repository: MenuRepo,

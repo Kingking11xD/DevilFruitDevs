@@ -304,3 +304,86 @@ def test_invalid_menu_restaurant_id(restaurant_id: str) -> None:
         )
 
         assert response.status_code == 422
+
+    @pytest.fixture
+def menu_item_files(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> list[dict]:
+    restaurant_data = [
+        {"id": 1, "name": "Pizza Mizza", "cuisine": "Italian", "address": "42 Pepperoni Lane"},
+        {"id": 2, "name": "Taco Town", "cuisine": "Mexican", "address": "7 Salsa St"},
+    ]
+    menu_data = [
+        {"id": 1, "restaurant_id": 1, "name": "Margherita Pizza", "price": 1600, "available": True},
+        {"id": 2, "restaurant_id": 2, "name": "Tacos al Pastor", "price": 1400, "available": False},
+    ]
+
+    restaurant_path = tmp_path / "restaurants.json"
+    restaurant_path.write_text(json.dumps(restaurant_data), encoding="utf-8")
+    menu_path = tmp_path / "menu_items.json"
+    menu_path.write_text(json.dumps(menu_data), encoding="utf-8")
+
+    monkeypatch.setattr(menu.restaurant_repository, "file_path", restaurant_path)
+    monkeypatch.setattr(menu.menu_repository, "file_path", menu_path)
+
+    return menu_data
+
+
+def test_menu_item(menu_item_files) -> None:
+    response = client.get("/restaurants/1/menu-items/1")
+
+    assert response.status_code == 200
+    assert response.json() == menu_item_files[0]
+
+
+def test_menu_item_unavailable_is_returned(menu_item_files) -> None:
+    response = client.get("/restaurants/2/menu-items/2")
+
+    assert response.status_code == 200
+    assert response.json()["available"] is False
+
+
+def test_menu_item_unknown_restaurant(menu_item_files) -> None:
+    response = client.get("/restaurants/999/menu-items/1")
+
+    assert response.status_code == 404
+    assert response.json() == {"detail": "Restaurant not found"}
+
+
+def test_menu_item_unknown_item(menu_item_files) -> None:
+    response = client.get("/restaurants/1/menu-items/999")
+
+    assert response.status_code == 404
+    assert response.json() == {"detail": "Menu item not found"}
+
+
+def test_menu_item_from_another_restaurant(menu_item_files) -> None:
+    # Item 2 exists, but it belongs to restaurant 2
+    response = client.get("/restaurants/1/menu-items/2")
+
+    assert response.status_code == 404
+    assert response.json() == {"detail": "Menu item not found"}
+
+
+@pytest.mark.parametrize(
+    "path",
+    [
+        "abc/menu-items/1",
+        "0/menu-items/1",
+        "-1/menu-items/1",
+        "1/menu-items/abc",
+        "1/menu-items/0",
+        "1/menu-items/-1",
+    ],
+)
+def test_menu_item_invalid_ids(path: str) -> None:
+    response = client.get(f"/restaurants/{path}")
+
+    assert response.status_code == 422
+
+
+def test_menu_item_does_not_modify_data(tmp_path, menu_item_files) -> None:
+    menu_path = menu.menu_repository.file_path
+    before = Path(menu_path).read_bytes()
+
+    client.get("/restaurants/1/menu-items/1")
+
+    assert Path(menu_path).read_bytes() == before

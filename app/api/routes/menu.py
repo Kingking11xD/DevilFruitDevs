@@ -29,6 +29,19 @@ service = MenuService(
     ),
     responses={404: {"description": "Restaurant not found"}},
 )
+
+@router.get(
+    "/restaurants/{restaurant_id}/menu-items",
+    response_model=list[MenuItem],
+    summary="View a restaurant's menu",
+    description=(
+        "Return all menu items for a restaurant, ordered by item ID."
+        "Unavailable items are included with available set to false."
+        "A restaurant with no items returns an empty list."
+    ),
+    responses={404: {"description": "Restaurant not found"}},
+)
+
 def get_menu(
     restaurant_id: Annotated[
         int,
