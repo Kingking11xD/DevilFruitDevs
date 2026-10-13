@@ -207,21 +207,21 @@ def test_restaurant_menu(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> Non
             "id": 2,
             "restaurant_id": 1,
             "name": "Pepperoni Pizza",
-            "price": 17.99,
+            "price": 1800,
             "available": True,
         },
         {
             "id": 1,
             "restaurant_id": 1,
             "name": "Margherita Pizza",
-            "price": 15.99,
+            "price": 1600,
             "available": True,
         },
         {
             "id": 3,
             "restaurant_id": 1,
             "name": "Garlic Bread",
-            "price": 7.99,
+            "price": 800,
             "available": False,
         },
     ]
@@ -250,16 +250,51 @@ def test_restaurant_menu(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> Non
         menu_path,
     )
 
-    response = client.get("/restaurants/1/menu")
+    response = client.get("/restaurants/1/menu-items")
 
     assert response.status_code == 200
     assert [item["id"] for item in response.json()] == [1, 2, 3]
     assert response.json()[2]["available"] is False
 
-    @pytest.mark.parametrize(
-    "restaurant_id",
-    ["abc", "0", "-1"],
-)
+
+def test_restaurant_menu_empty(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    restaurant_path = tmp_path / "restaurants.json"
+    restaurant_path.write_text(
+        json.dumps([{"id": 1, "name": "Kebab", "cuisine": "Turkish", "address": "1 Rd"}]),
+        encoding="utf-8",
+    )
+    menu_path = tmp_path / "menu_items.json"
+    menu_path.write_text("[]", encoding="utf-8")
+
+    monkeypatch.setattr(menu.restaurant_repository, "file_path", restaurant_path)
+    monkeypatch.setattr(menu.menu_repository, "file_path", menu_path)
+
+    response = client.get("/restaurants/1/menu-items")
+
+    assert response.status_code == 200
+    assert response.json() == []
+
+
+def test_restaurant_menu_not_found(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    restaurant_path = tmp_path / "restaurants.json"
+    restaurant_path.write_text("[]", encoding="utf-8")
+    menu_path = tmp_path / "menu_items.json"
+    menu_path.write_text("[]", encoding="utf-8")
+
+    monkeypatch.setattr(menu.restaurant_repository, "file_path", restaurant_path)
+    monkeypatch.setattr(menu.menu_repository, "file_path", menu_path)
+
+    response = client.get("/restaurants/999/menu-items")
+
+    assert response.status_code == 404
+    assert response.json() == {"detail": "Restaurant not found"}
+
+
+@pytest.mark.parametrize("restaurant_id", ["abc", "0", "-1"])
+def test_invalid_menu_restaurant_id(restaurant_id: str) -> None:
+    response = client.get(f"/restaurants/{restaurant_id}/menu-items")
+
+    assert response.status_code == 422
     
     def test_invalid_menu_restaurant_id(
         restaurant_id,

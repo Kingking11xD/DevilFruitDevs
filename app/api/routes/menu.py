@@ -2,29 +2,31 @@ from typing import Annotated, Any
 
 from fastapi import APIRouter, HTTPException, Path
 
+from app.api.routes.restaurants import repository as restaurant_repository
 from app.repositories.menu_repo import MenuRepo
-from app.repositories.restaurant_repo import RestaurantRepo
 from app.schemas.menu import MenuItem
-from app.services.menu_service import (
-    MenuService,
-    RestaurantNotFoundError,
-)
+from app.services.menu_service import MenuService
+from app.services.restaurant_service import RestaurantNotFoundError
 
 router = APIRouter()
 
-menu_repository = MenuRepo("data/menu_items.json")
-restaurant_repository = RestaurantRepo("data/restaurants.json")
+menu_repository = MenuRepo()
 
 service = MenuService(
     menu_repository,
     restaurant_repository,
 )
 
+
 @router.get(
-    "/restaurants/{restaurant_id}/menu",
+    "/restaurants/{restaurant_id}/menu-items",
     response_model=list[MenuItem],
     summary="View a restaurant's menu",
-    description="Return all menu items for a restaurant, ordered by item ID.",
+    description=(
+        "Return all menu items for a restaurant, ordered by item ID. "
+        "Unavailable items are included with available set to false. "
+        "A restaurant with no items returns an empty list."
+    ),
     responses={404: {"description": "Restaurant not found"}},
 )
 def get_menu(

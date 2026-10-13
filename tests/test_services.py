@@ -8,6 +8,7 @@ from app.services.restaurant_service import (
 )
 from app.services.menu_service import MenuService
 
+
 def test_get_restaurant_by_id() -> None:
     restaurant = {
         "id": 1, "name": "Kebab", "cuisine": "Turkish", "address": "120 Lovely Rd"
@@ -26,6 +27,7 @@ def test_get_restaurant_by_id() -> None:
     with pytest.raises(RestaurantNotFoundError):
         service.get_restaurant_by_id(999)
 
+
 def test_get_menu() -> None:
     restaurants = [
         {
@@ -41,21 +43,21 @@ def test_get_menu() -> None:
             "id": 3,
             "restaurant_id": 1,
             "name": "Garlic Bread",
-            "price": 7.99,
+            "price": 800,
             "available": False,
         },
         {
             "id": 1,
             "restaurant_id": 1,
             "name": "Kebab Plate",
-            "price": 15.99,
+            "price": 1600,
             "available": True,
         },
         {
             "id": 2,
             "restaurant_id": 1,
             "name": "Fries",
-            "price": 5.99,
+            "price": 600,
             "available": True,
         },
     ]
@@ -88,3 +90,6 @@ def test_get_menu() -> None:
 
     assert [item["id"] for item in result] == [1, 2, 3]
     assert result[2]["available"] is False
+
+    with pytest.raises(RestaurantNotFoundError):
+        service.get_menu(999)
