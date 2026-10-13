@@ -289,23 +289,13 @@ def test_restaurant_menu_not_found(tmp_path: Path, monkeypatch: pytest.MonkeyPat
     assert response.status_code == 404
     assert response.json() == {"detail": "Restaurant not found"}
 
-
 @pytest.mark.parametrize("restaurant_id", ["abc", "0", "-1"])
 def test_invalid_menu_restaurant_id(restaurant_id: str) -> None:
     response = client.get(f"/restaurants/{restaurant_id}/menu-items")
 
     assert response.status_code == 422
     
-    def test_invalid_menu_restaurant_id(
-        restaurant_id,
-    ) -> None:
-        response = client.get(
-            f"/restaurants/{restaurant_id}/menu"
-        )
-
-        assert response.status_code == 422
-
-    @pytest.fixture
+@pytest.fixture
 def menu_item_files(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> list[dict]:
     restaurant_data = [
         {"id": 1, "name": "Pizza Mizza", "cuisine": "Italian", "address": "42 Pepperoni Lane"},

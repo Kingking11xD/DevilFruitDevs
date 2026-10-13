@@ -30,3 +30,20 @@ class MenuService:
         )
 
         return sorted(items, key=lambda item: item["id"])
+
+    def get_menu_item(
+        self, restaurant_id: int, item_id: int
+    ) -> dict[str, Any]:
+
+        restaurant = self.restaurant_repository.get_by_id(restaurant_id)
+
+        if restaurant is None:
+            raise RestaurantNotFoundError("Restaurant not found")
+
+        item = self.menu_repository.get_by_id(item_id)
+
+        # An item that belongs to another restaurant counts as not found
+        if item is None or item["restaurant_id"] != restaurant_id:
+            raise MenuItemNotFoundError("Menu item not found")
+
+        return item
