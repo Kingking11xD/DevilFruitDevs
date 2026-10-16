@@ -4,7 +4,7 @@
 
 - **Sprint / Milestone:** M1 – First Vertical Slice
 - **Sprint dates:** 2026-10-05 to 2026-10-16
-- **Planning meeting date:** 2026-10-05
+- **Planning meeting date:** 2026-10-05, During Lab 10-02, 10-09, 10-16
 - **Facilitator:** Leo Cabral
 
 ### Team Members
@@ -119,7 +119,7 @@ Before ending the meeting, each team member should confirm their understanding o
 
 ## Meeting Notes
 
-- Meeting held on Oct 5
-- Each issue needs acceptance criteria, tests, and one main owner.
-- Every PR must be reviewed by another teammate before merging.
-- Sample data uses One Piece themed restaurants and should be adjusted in the later stages of project.
+- Meeting held on Oct 5 and discussion on the work and schedule arrangement during lab
+- Each issue needs acceptance criteria, tests, and one main owner
+- Every PR must be reviewed by another teammate before merging
+- Sample data uses One Piece themed restaurants and should be adjusted in the later stages of project
