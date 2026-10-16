@@ -164,8 +164,7 @@ Identify work that depends on another team member, subsystem, or component.
 |---|---|---|---|
 | Shared JSON storage (#26) | #24, #25, #40, #41 | Keenan | Merge first so others can build on it |
 | Restaurant IDs and sample data | #16, #18, #33 | Keenan | Agree on IDs before menu data is added |
-| Backend endpoints | #37 | Ansella, Keenan, Leyla | Share endpoint paths with Leo early |
-
+| Backend endpoints | #37 | Ansella, Keenan, Leyla | Leo starts frontend once most backend endpoints are merged; backend owners share endpoint paths and response formats with him early |
 
 ### Integration Plan
 
@@ -182,6 +181,7 @@ Identify anything that could prevent the team from achieving the sprint goal.
 | Persistence layer finished late | Create/update work is blocked | Build read-only endpoints first           | Keenan |
 | PRs not reviewed in time        | Work not merged for M1        | Ask for reviews as soon as a PR is opened | Everyone |
 | Short deadline                  | Features unfinished           | Focus on high-priority stories first      | Everyone |
+| Backend finished late | Frontend (#37) can't be completed in time | Merge backend PRs early so Leo can start the frontend | Ansella, Keenan, Leyla |
 
 ---
 
