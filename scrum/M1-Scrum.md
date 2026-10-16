@@ -4,7 +4,7 @@
 
 - **Sprint / Milestone:** M1 – First Vertical Slice
 - **Sprint dates:** 2026-10-05 to 2026-10-16
-- **Planning meeting date:** 2026-10-05
+- **Planning meeting date:** 2026-10-05, During Lab 10-02, 10-09, 10-16
 - **Facilitator:** Leo Cabral
 
 ### Team Members
@@ -33,10 +33,18 @@ Select the user stories that the team commits to working on during this sprint.
 
 | User Story | Description | Priority | Primary Owner | Dependencies |
 |---|---|---|---|---|
-| #5 | Restaurant discovery: list, search by name (#19), filter by cuisine (#20) | High | Ansella | Restaurant data |
-| #24, 25 | Restaurant details, create and update a restaurant | High | Keenan | JSON persistence (#26) |
-| #6 | Menu management: view menu, view item, add item, update item | High | Leyla | JSON persistence (#26), restaurant IDs|
-| # | Frontend UI, CI and submission | High | Leo | Backend endpoints |
+| #18 | List restaurants | High | Ansella | Restaurant data |
+| #19 | Search restaurants by name | High | Ansella | #18 |
+| #20 | Filter restaurants by cuisine | High | Ansella | #18 |
+| #16 | View restaurant details | High | Keenan | Restaurant data |
+| #24 | Create a restaurant | High | Keenan | #26 |
+| #25 | Update restaurant information | High | Keenan | #26 |
+| #26 | Add shared JSON storage (task) | High | Keenan | None |
+| #33 | View restaurant's menu | High | Leyla | #16, restaurant IDs |
+| #39 | View a menu item | Medium | Leyla | #33 |
+| #40 | Add menu item | High | Leyla | #26, #33 |
+| #41 | Update menu item | Medium | Leyla | #26, #33 |
+| #37 | Frontend UI, CI and submission | High | Leo | Backend endpoints |
 
 
 > **Important:** Primary ownership means that the student is responsible for coordinating the work. It does not mean that the student works alone or that other team members cannot contribute.
@@ -49,11 +57,102 @@ Break larger user stories into smaller tasks that can be implemented, reviewed, 
 
 ### User Story #[NUMBER] — [TITLE]
 
-- [ ] Task
-- [ ] Task
-- [ ] Task
+### User Story #18 - List Restaurants
+
+- [ ] Add/update the Pydantic response model
+- [ ] Return each restaurant's ID, name, cuisine and address
+- [ ] Return an empty list when there are no restaurants
 - [ ] Tests
 - [ ] Documentation / API updates
+
+### User Story #19 - Search Restaurants by Name
+
+- [ ] Implement restaurant name search
+- [ ] Support partial matches
+- [ ] Make search case insensitive
+- [ ] Tests
+- [ ] Documentation / API updates
+
+### User Story #20 - Filter Restaurants by Cuisine
+
+- [ ] Implement filtering by cuisine
+- [ ] Make filtering case insensitive
+- [ ] Support using search and cuisine filter together
+- [ ] Tests
+- [ ] Documentation / API updates
+
+### User Story #16 - View Restaurant Details
+
+- [ ] Add the lookup in the repository and handle missing restaurants in the service
+- [ ] Add the endpoint with a Pydantic response model and ID validation
+- [ ] Add addresses to the sample restaurants without changing their IDs
+- [ ] Tests
+- [ ] Documentation / API updates
+
+### User Story #24 - Create a Restaurant
+
+- [ ] Add the endpoint
+- [ ] Add input validation
+- [ ] Add saving logic with a server-assigned ID
+- [ ] Tests
+- [ ] Documentation / API updates
+
+### User Story #25 - Update Restaurant Information
+
+- [ ] Add the endpoint
+- [ ] Add input validation (omitted fields and ID unchanged)
+- [ ] Add saving logic
+- [ ] Tests
+- [ ] Documentation / API updates
+
+### User Story #26 - Add Shared JSON Storage
+
+- [ ] Configurable data folder using DATA_DIR
+- [ ] Safe saves using temporary-file replacement
+- [ ] One shared lock for read, change and save
+- [ ] Tests
+- [ ] Documentation / API updates
+
+### User Story #33 - View Restaurant's Menu
+
+- [ ] Add the menu item model, repository, service and endpoint
+- [ ] Add menu data in a separate JSON file whose items belong to existing restaurants
+- [ ] Return 404 for unknown restaurant IDs and 422 for invalid IDs
+- [ ] Tests
+- [ ] Documentation / API updates
+
+### User Story #39 - View a Menu Item
+
+- [ ] Add item lookup by ID
+- [ ] Check that the item belongs to the restaurant
+- [ ] Return 404 for unknown or mismatched IDs and 422 for invalid IDs
+- [ ] Tests
+- [ ] Documentation / API updates
+
+### User Story #40 - Add Menu Item
+
+- [ ] Add the request model and endpoint
+- [ ] Add input validation (name, positive whole-number price, availability default)
+- [ ] Add saving logic with a server-assigned ID
+- [ ] Tests
+- [ ] Documentation / API updates
+
+### User Story #41 - Update Menu Item
+
+- [ ] Add the MenuItemUpdate schema
+- [ ] Add the repository update method using the shared JSON storage
+- [ ] Add the PATCH endpoint (only supplied fields change)
+- [ ] Tests
+- [ ] Documentation / API updates
+
+### User Story #37 - Frontend and Submission
+
+- [ ] Restaurant list, details and menu UI
+- [ ] Restaurant create/update forms
+- [ ] CI setup and submission PDF
+- [ ] Tests
+- [ ] Documentation / API updates
+
 
 ---
 
@@ -61,12 +160,11 @@ Break larger user stories into smaller tasks that can be implemented, reviewed, 
 
 Identify work that depends on another team member, subsystem, or component.
 
-| Dependency                     | Related User Stories | Who is Responsible?    | Planned Resolution |
+| Dependency | Related User Stories | Who is Responsible? | Planned Resolution |
 |---|---|---|---|
-| Shared JSON persistence        | #24, #25, #6         | Keenan                 | Merge first so others can build on it |
-| Restaurant IDs and sample data | #5, #6               | Keenan                 | Agree on IDs before menu data is added |
-| Backend endpoints              | Frontend             | Ansella, Keenan, Leyla | Share endpoint paths with Leo early |
-
+| Shared JSON storage (#26) | #24, #25, #40, #41 | Keenan | Merge first so others can build on it |
+| Restaurant IDs and sample data | #16, #18, #33 | Keenan | Agree on IDs before menu data is added |
+| Backend endpoints | #37 | Ansella, Keenan, Leyla | Leo starts frontend once most backend endpoints are merged; backend owners share endpoint paths and response formats with him early |
 
 ### Integration Plan
 
@@ -83,6 +181,7 @@ Identify anything that could prevent the team from achieving the sprint goal.
 | Persistence layer finished late | Create/update work is blocked | Build read-only endpoints first           | Keenan |
 | PRs not reviewed in time        | Work not merged for M1        | Ask for reviews as soon as a PR is opened | Everyone |
 | Short deadline                  | Features unfinished           | Focus on high-priority stories first      | Everyone |
+| Backend finished late | Frontend (#37) can't be completed in time | Merge backend PRs early so Leo can start the frontend | Ansella, Keenan, Leyla |
 
 ---
 
@@ -119,7 +218,7 @@ Before ending the meeting, each team member should confirm their understanding o
 
 ## Meeting Notes
 
-- Meeting held on Oct 5
-- Each issue needs acceptance criteria, tests, and one main owner.
-- Every PR must be reviewed by another teammate before merging.
-- Sample data uses One Piece themed restaurants and should be adjusted in the later stages of project.
+- Meeting held on Oct 5 and discussion on the work and schedule arrangement during lab
+- Each issue needs acceptance criteria, tests, and one main owner
+- Every PR must be reviewed by another teammate before merging
+- Sample data uses One Piece themed restaurants and should be adjusted in the later stages of project

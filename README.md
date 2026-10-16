@@ -14,7 +14,12 @@ Set-ExecutionPolicy -Scope Process -ExecutionPolicy Bypass # (current powershell
 Then retry the activation command above.
 
 **Start application from project root:**\
-python -m uvicorn main:app --reload
+python -m uvicorn main:app --reload\
+After running the application open another terminal\
+cd frontend \
+npm run dev
+
+
 
 **API endpoints:**   
 Health check: `http://127.0.0.1:8000/health`  
