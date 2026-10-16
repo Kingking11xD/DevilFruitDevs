@@ -119,7 +119,7 @@ Before ending the meeting, each team member should confirm their understanding o
 
 ## Meeting Notes
 
-- Meeting held in COM 108, 2:00–3:30 p.m.
+- Meeting held on Oct 5
 - Each issue needs acceptance criteria, tests, and one main owner.
 - Every PR must be reviewed by another teammate before merging.
 - Sample data uses One Piece themed restaurants and should be adjusted in the later stages of project.
