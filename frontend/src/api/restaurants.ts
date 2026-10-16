@@ -32,9 +32,7 @@ export async function fetchRestaurantById(id: number): Promise<Restaurant> {
   return response.json();
 }
 
-export async function createRestaurant(
-  data: RestaurantCreate
-): Promise<Restaurant> {
+export async function createRestaurant(data: RestaurantCreate): Promise<Restaurant> {
   const response = await fetch(`${API_BASE_URL}/restaurants`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
@@ -43,7 +41,16 @@ export async function createRestaurant(
 
   if (!response.ok) {
     const errorData = await response.json().catch(() => ({}));
-    throw new Error(errorData.detail || "Failed to create restaurant.");
+    let errorMessage = "Failed to create restaurant.";
+
+    // Parse FastAPI's array of validation errors
+    if (Array.isArray(errorData.detail)) {
+      errorMessage = errorData.detail.map((err: any) => err.msg).join(", ");
+    } else if (typeof errorData.detail === "string") {
+      errorMessage = errorData.detail;
+    }
+
+    throw new Error(errorMessage);
   }
   return response.json();
 }
