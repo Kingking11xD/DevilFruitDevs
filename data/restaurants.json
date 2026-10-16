@@ -10,5 +10,11 @@
     "name": "Cantina del Centro",
     "cuisine": "Mexican",
     "address": "9001 Vegeta Drive"
+  },
+  {
+    "id": 3,
+    "name": "Barrate",
+    "cuisine": "Fish",
+    "address": "East blue"
   }
 ]
