@@ -1,5 +1,7 @@
-from app.repositories.restaurant_repo import RestaurantRepo
 from typing import Any
+
+from app.repositories.restaurant_repo import RestaurantMissingError, RestaurantRepo
+
 
 class RestaurantNotFoundError(Exception):
     """The requested restaurant does not exist."""
@@ -41,3 +43,12 @@ class RestaurantService:
             raise RestaurantNotFoundError("Restaurant not found")
 
         return restaurant
+
+    def create_restaurant(self, name: str, cuisine: str, address: str) -> dict[str, Any]:
+        return self.repository.create(name, cuisine, address)
+    
+    def update_restaurant(self, restaurant_id: int, changes: dict[str, Any]) -> dict[str, Any]:
+        try:
+            return self.repository.update(restaurant_id, changes)
+        except RestaurantMissingError as error:
+            raise RestaurantNotFoundError("Restaurant not found") from error
