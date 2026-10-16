@@ -14,13 +14,19 @@ Set-ExecutionPolicy -Scope Process -ExecutionPolicy Bypass # (current powershell
 Then retry the activation command above.
 
 **Start application from project root:**\
-python -m uvicorn main:app --reload
+python -m uvicorn main:app --reload\
+After running the application open another terminal\
+cd frontend \
+npm run dev
+
+
 
 **API endpoints:**   
 Health check: http://127.0.0.1:8000/health  
 Restaurant list: http://127.0.0.1:8000/restaurants  
 Restaurant details: http://127.0.0.1:8000/restaurants/1
 API documentation: http://127.0.0.1:8000/docs  
+Frontend: http://localhost:5173/
 
 **Data storage:**  
 Data defaults to `data/restaurants.json`. To change the folder before starting the app:  
