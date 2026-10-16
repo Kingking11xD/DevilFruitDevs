@@ -8,6 +8,9 @@ export default function App() {
   const [cuisineFilter, setCuisineFilter] = useState("");
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  
+  // New state to trigger a clean re-fetch after creation
+  const [refresh, setRefresh] = useState(0);
 
   const [newRestaurant, setNewRestaurant] = useState<RestaurantCreate>({
     name: "",
@@ -15,28 +18,42 @@ export default function App() {
     address: "",
   });
 
-  const loadData = async () => {
-    setLoading(true);
-    setError(null);
-    try {
-      const data = await fetchRestaurants({
-        search: search || undefined,
-        cuisine: cuisineFilter || undefined,
-      });
-      setRestaurants(data);
-    } catch (err) {
-      setError(err instanceof Error ? err.message : "An error occurred");
-    } finally {
-      setLoading(false);
-    }
-  };
-
   useEffect(() => {
+    let isCurrent = true; // Tracks if this specific effect run is still active
+
+    const loadData = async () => {
+      setLoading(true);
+      setError(null);
+      try {
+        const data = await fetchRestaurants({
+          search: search || undefined,
+          cuisine: cuisineFilter || undefined,
+        });
+        
+        // Only update state if a newer search hasn't already started
+        if (isCurrent) {
+          setRestaurants(data);
+        }
+      } catch (err) {
+        if (isCurrent) {
+          setError(err instanceof Error ? err.message : "An error occurred");
+        }
+      } finally {
+        if (isCurrent) {
+          setLoading(false);
+        }
+      }
+    };
+
     const debounceTimer = setTimeout(() => {
       loadData();
     }, 250);
-    return () => clearTimeout(debounceTimer);
-  }, [search, cuisineFilter]);
+
+    return () => {
+      clearTimeout(debounceTimer);
+      isCurrent = false; // Marks this network request's results as outdated
+    };
+  }, [search, cuisineFilter, refresh]); // Added 'refresh' as a dependency
 
   const handleCreate = async (e: FormEvent) => {
     e.preventDefault();
@@ -45,9 +62,11 @@ export default function App() {
     }
 
     try {
-      const created = await createRestaurant(newRestaurant);
-      setRestaurants((prev) => [...prev, created]);
+      await createRestaurant(newRestaurant);
       setNewRestaurant({ name: "", cuisine: "", address: "" });
+      
+      // Trigger a re-fetch so the backend handles filtering the new item
+      setRefresh((prev) => prev + 1); 
     } catch (err) {
       alert(err instanceof Error ? err.message : "Failed to create restaurant");
     }
