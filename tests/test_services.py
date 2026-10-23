@@ -143,3 +143,8 @@ def test_add_menu_item_unknown_restaurant_raises():
     service = make_menu_item_service()
     with pytest.raises(RestaurantNotFoundError):
         service.add_menu_item(999, {"name": "X", "price": 100, "available": True})
+
+def test_update_menu_item_from_another_restaurant_raises():
+    service = make_menu_item_service()
+    with pytest.raises(MenuItemNotFoundError):
+        service.update_menu_item(1, 2, {"price": 500})

@@ -127,3 +127,15 @@ def test_menu_repo_create_assigns_next_id(tmp_path):
     assert first["id"] == 1
     assert second["id"] == 2
     assert len(repo.get_all()) == 2
+
+def test_menu_repo_update(tmp_path):
+    path = tmp_path / "menu_items.json"
+    path.write_text(
+        json.dumps([{"id": 1, "restaurant_id": 1, "name": "A", "price": 100, "available": True}])
+    )
+    repo = MenuRepo(path)
+    updated = repo.update(1, {"price": 250})
+    assert updated["price"] == 250
+    assert updated["name"] == "A"
+    assert repo.get_by_id(1)["price"] == 250
+    assert repo.update(99, {"price": 1}) is None

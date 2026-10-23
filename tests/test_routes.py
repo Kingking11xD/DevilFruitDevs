@@ -405,3 +405,48 @@ def test_add_menu_item_unknown_restaurant(menu_item_files):
 ])
 def test_add_menu_item_invalid_body(menu_item_files, body):
     assert client.post("/restaurants/1/menu-items", json=body).status_code == 422
+
+def test_update_menu_item(menu_item_files):
+    response = client.patch("/restaurants/1/menu-items/1", json={"price": 1900})
+
+    assert response.status_code == 200
+    assert response.json() == {**menu_item_files[0], "price": 1900}
+    assert client.get("/restaurants/1/menu-items/1").json()["price"] == 1900
+
+
+def test_update_menu_item_availability(menu_item_files):
+    response = client.patch("/restaurants/2/menu-items/2", json={"available": True})
+
+    assert response.status_code == 200
+    assert response.json()["available"] is True
+
+
+def test_update_menu_item_unknown_restaurant(menu_item_files):
+    response = client.patch("/restaurants/999/menu-items/1", json={"price": 100})
+
+    assert response.status_code == 404
+    assert response.json() == {"detail": "Restaurant not found"}
+
+
+def test_update_menu_item_unknown_item(menu_item_files):
+    response = client.patch("/restaurants/1/menu-items/999", json={"price": 100})
+
+    assert response.status_code == 404
+    assert response.json() == {"detail": "Menu item not found"}
+
+
+def test_update_menu_item_from_another_restaurant(menu_item_files):
+    response = client.patch("/restaurants/1/menu-items/2", json={"price": 100})
+
+    assert response.status_code == 404
+    assert response.json() == {"detail": "Menu item not found"}
+
+
+@pytest.mark.parametrize("body", [
+    {"name": ""},
+    {"price": 0},
+    {"price": -5},
+    {"price": "abc"},
+])
+def test_update_menu_item_invalid_body(menu_item_files, body):
+    assert client.patch("/restaurants/1/menu-items/1", json=body).status_code == 422

@@ -38,3 +38,13 @@ class MenuRepo:
             return item
 
         return update_records(self.file_path, add)
+
+    def update(self, item_id: int, changes: dict[str, Any]) -> dict[str, Any] | None:
+        def apply(records: list[dict]) -> dict[str, Any] | None:
+            for record in records:
+                if record["id"] == item_id:
+                    record.update(changes)
+                    return record
+            return None
+
+        return update_records(self.file_path, apply)

@@ -4,7 +4,7 @@ from fastapi import APIRouter, HTTPException, Path, status
 
 from app.api.routes.restaurants import repository as restaurant_repository
 from app.repositories.menu_repo import MenuRepo
-from app.schemas.menu import MenuItem, MenuItemCreate
+from app.schemas.menu import MenuItem, MenuItemCreate, MenuItemUpdate
 from app.services.menu_service import MenuItemNotFoundError, MenuService
 from app.services.restaurant_service import RestaurantNotFoundError
 
@@ -91,3 +91,24 @@ def add_menu_item(
         return service.add_menu_item(restaurant_id, body.model_dump())
     except RestaurantNotFoundError:
         raise HTTPException(status_code=404, detail="Restaurant not found")
+
+
+@router.patch(
+    "/restaurants/{restaurant_id}/menu-items/{item_id}",
+    response_model=MenuItem,
+    summary="Update menu item",
+    responses={404: {"description": "Restaurant or menu item not found"}},
+)
+def update_menu_item(
+    restaurant_id: Annotated[int, Path(gt=0)],
+    item_id: Annotated[int, Path(gt=0)],
+    body: MenuItemUpdate,
+) -> dict:
+    try:
+        return service.update_menu_item(
+            restaurant_id, item_id, body.model_dump(exclude_none=True)
+        )
+    except RestaurantNotFoundError:
+        raise HTTPException(status_code=404, detail="Restaurant not found")
+    except MenuItemNotFoundError:
+        raise HTTPException(status_code=404, detail="Menu item not found")

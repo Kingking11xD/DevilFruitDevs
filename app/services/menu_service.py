@@ -52,3 +52,10 @@ class MenuService:
         if self.restaurant_repository.get_by_id(restaurant_id) is None:
             raise RestaurantNotFoundError
         return self.menu_repository.create(restaurant_id, data)
+
+    def update_menu_item(self, restaurant_id: int, item_id: int, changes: dict) -> dict:
+        self.get_menu_item(restaurant_id, item_id)
+        updated = self.menu_repository.update(item_id, changes)
+        if updated is None:
+            raise MenuItemNotFoundError
+        return updated
