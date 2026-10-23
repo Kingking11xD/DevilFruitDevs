@@ -17,7 +17,6 @@ export default function App() {
     address: "",
   });
 
-  // New state variables for editing
   const [editingId, setEditingId] = useState<number | null>(null);
   const [editFormData, setEditFormData] = useState<RestaurantUpdate>({});
 
@@ -72,7 +71,6 @@ export default function App() {
     }
   };
 
-  // New function to handle saving updates
   const handleUpdate = async (id: number) => {
     try {
       await updateRestaurant(id, editFormData);
@@ -146,23 +144,32 @@ export default function App() {
               }}
             >
               {editingId === item.id ? (
-                // Edit Mode UI
-                <div style={{ display: "flex", gap: "0.5rem", flex: 1, marginRight: "1rem" }}>
-                  <input
-                    value={editFormData.name || ""}
-                    onChange={(e) => setEditFormData({ ...editFormData, name: e.target.value })}
-                    style={{ flex: 1 }}
-                  />
-                  <input
-                    value={editFormData.cuisine || ""}
-                    onChange={(e) => setEditFormData({ ...editFormData, cuisine: e.target.value })}
-                    style={{ width: "100px" }}
-                  />
-                  <input
-                    value={editFormData.address || ""}
-                    onChange={(e) => setEditFormData({ ...editFormData, address: e.target.value })}
-                    style={{ flex: 1 }}
-                  />
+                // Edit Mode UI with Labels
+                <div style={{ display: "flex", gap: "1rem", flex: 1, marginRight: "1rem" }}>
+                  <label style={{ display: "flex", flexDirection: "column", flex: 1 }}>
+                    <span style={{ fontSize: "0.8rem", color: "#555", marginBottom: "0.2rem" }}>Name:</span>
+                    <input
+                      value={editFormData.name || ""}
+                      onChange={(e) => setEditFormData({ ...editFormData, name: e.target.value })}
+                      style={{ padding: "0.25rem" }}
+                    />
+                  </label>
+                  <label style={{ display: "flex", flexDirection: "column", width: "120px" }}>
+                    <span style={{ fontSize: "0.8rem", color: "#555", marginBottom: "0.2rem" }}>Cuisine:</span>
+                    <input
+                      value={editFormData.cuisine || ""}
+                      onChange={(e) => setEditFormData({ ...editFormData, cuisine: e.target.value })}
+                      style={{ padding: "0.25rem" }}
+                    />
+                  </label>
+                  <label style={{ display: "flex", flexDirection: "column", flex: 2 }}>
+                    <span style={{ fontSize: "0.8rem", color: "#555", marginBottom: "0.2rem" }}>Address:</span>
+                    <input
+                      value={editFormData.address || ""}
+                      onChange={(e) => setEditFormData({ ...editFormData, address: e.target.value })}
+                      style={{ padding: "0.25rem" }}
+                    />
+                  </label>
                 </div>
               ) : (
                 // Display Mode UI
