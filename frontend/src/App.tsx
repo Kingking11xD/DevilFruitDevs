@@ -1,6 +1,6 @@
 import { useEffect, useState, FormEvent } from "react";
-import { Restaurant, RestaurantCreate } from "./types/restaurant";
-import { fetchRestaurants, createRestaurant } from "./api/restaurants";
+import { Restaurant, RestaurantCreate, RestaurantUpdate } from "./types/restaurant";
+import { fetchRestaurants, createRestaurant, updateRestaurant } from "./api/restaurants";
 
 export default function App() {
   const [restaurants, setRestaurants] = useState<Restaurant[]>([]);
@@ -9,7 +9,6 @@ export default function App() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   
-  // New state to trigger a clean re-fetch after creation
   const [refresh, setRefresh] = useState(0);
 
   const [newRestaurant, setNewRestaurant] = useState<RestaurantCreate>({
@@ -18,8 +17,12 @@ export default function App() {
     address: "",
   });
 
+  // New state variables for editing
+  const [editingId, setEditingId] = useState<number | null>(null);
+  const [editFormData, setEditFormData] = useState<RestaurantUpdate>({});
+
   useEffect(() => {
-    let isCurrent = true; // Tracks if this specific effect run is still active
+    let isCurrent = true; 
 
     const loadData = async () => {
       setLoading(true);
@@ -30,7 +33,6 @@ export default function App() {
           cuisine: cuisineFilter || undefined,
         });
         
-        // Only update state if a newer search hasn't already started
         if (isCurrent) {
           setRestaurants(data);
         }
@@ -51,9 +53,9 @@ export default function App() {
 
     return () => {
       clearTimeout(debounceTimer);
-      isCurrent = false; // Marks this network request's results as outdated
+      isCurrent = false; 
     };
-  }, [search, cuisineFilter, refresh]); // Added 'refresh' as a dependency
+  }, [search, cuisineFilter, refresh]);
 
   const handleCreate = async (e: FormEvent) => {
     e.preventDefault();
@@ -64,11 +66,20 @@ export default function App() {
     try {
       await createRestaurant(newRestaurant);
       setNewRestaurant({ name: "", cuisine: "", address: "" });
-      
-      // Trigger a re-fetch so the backend handles filtering the new item
       setRefresh((prev) => prev + 1); 
     } catch (err) {
       alert(err instanceof Error ? err.message : "Failed to create restaurant");
+    }
+  };
+
+  // New function to handle saving updates
+  const handleUpdate = async (id: number) => {
+    try {
+      await updateRestaurant(id, editFormData);
+      setEditingId(null);
+      setRefresh((prev) => prev + 1);
+    } catch (err) {
+      alert(err instanceof Error ? err.message : "Failed to update restaurant");
     }
   };
 
@@ -131,13 +142,55 @@ export default function App() {
                 padding: "0.75rem 0",
                 display: "flex",
                 justifyContent: "space-between",
+                alignItems: "center"
               }}
             >
-              <div>
-                <strong>{item.name}</strong> — <em>{item.cuisine}</em>
-                <div style={{ color: "#666", fontSize: "0.9rem" }}>{item.address}</div>
+              {editingId === item.id ? (
+                // Edit Mode UI
+                <div style={{ display: "flex", gap: "0.5rem", flex: 1, marginRight: "1rem" }}>
+                  <input
+                    value={editFormData.name || ""}
+                    onChange={(e) => setEditFormData({ ...editFormData, name: e.target.value })}
+                    style={{ flex: 1 }}
+                  />
+                  <input
+                    value={editFormData.cuisine || ""}
+                    onChange={(e) => setEditFormData({ ...editFormData, cuisine: e.target.value })}
+                    style={{ width: "100px" }}
+                  />
+                  <input
+                    value={editFormData.address || ""}
+                    onChange={(e) => setEditFormData({ ...editFormData, address: e.target.value })}
+                    style={{ flex: 1 }}
+                  />
+                </div>
+              ) : (
+                // Display Mode UI
+                <div style={{ flex: 1 }}>
+                  <strong>{item.name}</strong> — <em>{item.cuisine}</em>
+                  <div style={{ color: "#666", fontSize: "0.9rem" }}>{item.address}</div>
+                </div>
+              )}
+              
+              <div style={{ display: "flex", gap: "0.5rem", alignItems: "center" }}>
+                <span style={{ color: "#aaa", fontSize: "0.85rem", marginRight: "1rem" }}>ID: {item.id}</span>
+                
+                {editingId === item.id ? (
+                  <>
+                    <button onClick={() => handleUpdate(item.id)}>Save</button>
+                    <button onClick={() => setEditingId(null)}>Cancel</button>
+                  </>
+                ) : (
+                  <button 
+                    onClick={() => {
+                      setEditingId(item.id);
+                      setEditFormData({ name: item.name, cuisine: item.cuisine, address: item.address });
+                    }}
+                  >
+                    Edit
+                  </button>
+                )}
               </div>
-              <span style={{ color: "#aaa", fontSize: "0.85rem" }}>ID: {item.id}</span>
             </li>
           ))}
         </ul>
