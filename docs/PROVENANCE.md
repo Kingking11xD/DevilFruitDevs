@@ -1,8 +1,21 @@
 # Provenance
 
-| File | Path | AI use |
-| --- | --- | --- |
-| m1-design.md | `docs/m1-design.md` | Codex drafted and documented shared design decisions. |
-| epic.md | `.github/ISSUE_TEMPLATE/epic.md` | Codex drafted the template based on Lecture 6. |
-| user_story.md | `.github/ISSUE_TEMPLATE/user_story.md` | Codex drafted the template based on Lecture 6. |
-| task.md | `.github/ISSUE_TEMPLATE/task.md` | Codex drafted the template based on Lecture 6. |
+| Student(s) | File | Path | Provenance label | AI tool, purpose, and influence | Validation |
+| --- | --- | --- | --- | --- | --- |
+| Keenan | m1-design.md | `docs/m1-design.md` | AI-ASSISTED | Recorded shared design decisions. Codex wrote the final documentation. | Reviewed against project requirements and team decisions. |
+| Keenan | epic.md | `.github/ISSUE_TEMPLATE/epic.md` | AI-GENERATED | Codex drafted the template based on Lecture 6. | Reviewed against Lecture 6 and checked the template structure. |
+| Keenan | user_story.md | `.github/ISSUE_TEMPLATE/user_story.md` | AI-GENERATED | Codex drafted the template based on Lecture 6. | Reviewed against Lecture 6 and checked the template structure. |
+| Keenan | task.md | `.github/ISSUE_TEMPLATE/task.md` | AI-GENERATED | Codex drafted the template based on Lecture 6. | Reviewed against Lecture 6 and checked the template structure. |
+| Keenan | test_repositories.py | `tests/test_repositories.py` | AI-ASSISTED | Codex provided guidance for four JSON-related tests. | Ran the added tests and confirmed they passed. |
+| Keenan | test_create_restaurant.py | `tests/test_create_restaurant.py` | AI-ASSISTED | Codex provided guidance for three restaurant-creation tests. | Ran the added tests and confirmed they passed. |
+| Ansella | restaurants.py | `app/api/routes/restaurants.py` | AI-GENERATED | Codex helped draft the query parameter changes for restaurant search and cuisine filtering. The code was reviewed and adapted to fit the existing endpoint. | Ran the full test suite and checked the endpoint in FastAPI docs. |
+| Ansella | restaurant_service.py | `app/services/restaurant_service.py` | AI-GENERATED | Codex helped with the search and cuisine filtering logic. The code was reviewed and adjusted to match the project requirements. | Ran the full test suite and manually verified search and filter behavior. |
+| Ansella | test_routes.py | `tests/test_routes.py` | AI-GENERATED / AI-REVISED | Codex helped with test cases for restaurant listing, search, and cuisine filtering, and later suggested simplifying the cuisine filter tests after PR review feedback. The tests were reviewed and adjusted before use. | Ran the full pytest suite and confirmed all tests passed. |
+| Leo Cabral | frontend | frontend/ | AI assisted | Gemini; guided scaffolding of the Vite React + TypeScript environment and provided commands to bypass npm cache and dependency errors. | Executed npm run dev successfully and resolved build crashes. |
+| Leo Cabral | restaurants.ts | frontend/src/api/restaurants.ts | AI generated | Gemini; created a typed fetch API client handling URL parameters and JSON parsing to connect with the FastAPI backend. | Verified data retrieval and payload submissions in the browser network tab. |
+| Leo Cabral | restaurant.ts | frontend/src/types/restaurant.ts | AI generated | Gemini; wrote TypeScript interfaces mirroring the backend Pydantic schemas to ensure frontend type safety. | Resolved duplicate declaration errors and passed Vite's TypeScript compiler checks. |
+| Leo Cabral | App.tsx | frontend/src/App.tsx | AI generated | Gemini; generated the main React UI component managing state for live restaurant filtering, listing, and creation forms. | Conducted manual testing of the user interface to confirm successful form submissions and data rendering. |
+| Leyla Huseynova | Menu endpoint and supporting files | `app/services/menu_service.py` | AI-ASSISTED | Codex provided implementation guidance for the route-service-repository structure. | Double checked my code in relation to US stories and checked the endpoint outputs against the acceptance criteria. |
+| Leyla Huseynova | Menu repository | app/repositories/menu_repo.py | AI-ASSISTED | Codex provided guidance on retrieving menu items from a separate JSON file and looking up items by restaurant ID and item ID. | Ran repository tests and checked the returned data against the sample menu data. |
+| Leyla Huseynova | Menu API tests | `tests/test_services.py` | AI-GENERATED | Codex helped with test implementation and debugging for menu-related functionality. | Ran the test suite and confirmed that the tests passed. |
+| Leyla Huseynova | Test execution and debugging | `tests/test_repositories.py` | AI-ASSISTED | Gemini helped troubleshoot test execution and dependency-related errors during development. | Reran the test suite after resolving the issues and checked the results. |

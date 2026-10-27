@@ -148,3 +148,25 @@ def test_update_menu_item_from_another_restaurant_raises():
     service = make_menu_item_service()
     with pytest.raises(MenuItemNotFoundError):
         service.update_menu_item(1, 2, {"price": 500})
+def test_create_restaurant(): # Test that the service passes restaurant details to the repository and returns the result
+    class FakeRepository: # A fake repository keeps this test from using real files
+        def create(self, name, cuisine, address):
+            return {
+                "id": 1,
+                "name": name,
+                "cuisine": cuisine,
+                "address": address,
+            }
+
+    service = RestaurantService(FakeRepository())
+
+    result = service.create_restaurant(
+        "Baratie", "Seafood", "East Blue"
+    )
+
+    assert result == {
+        "id": 1,
+        "name": "Baratie",
+        "cuisine": "Seafood",
+        "address": "East Blue",
+    }

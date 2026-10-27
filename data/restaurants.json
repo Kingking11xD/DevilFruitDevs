@@ -1,14 +1,20 @@
 [
   {
     "id": 1,
-    "name": "Pizza Mizza",
-    "cuisine": "Italian",
-    "address": "42 Pepperoni Lane"
+    "name": "Sushi kawa",
+    "cuisine": "Japanese",
+    "address": "Dressrosa"
   },
   {
     "id": 2,
     "name": "Cantina del Centro",
     "cuisine": "Mexican",
     "address": "9001 Vegeta Drive"
+  },
+  {
+    "id": 3,
+    "name": "Barrate",
+    "cuisine": "Fish",
+    "address": "East blue"
   }
 ]
