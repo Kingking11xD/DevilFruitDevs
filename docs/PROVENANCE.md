@@ -2,6 +2,7 @@
 
 | Student(s) | File | Path | Provenance label | AI tool, purpose, and influence | Validation |
 | --- | --- | --- | --- | --- | --- |
+| Keenan | m2-design.md | `docs/m2-design.md` | AI-ASSISTED | Recorded shared design decisions. Codex wrote the final documentation. | Reviewed against project requirements and team decisions. |
 | Keenan | m1-design.md | `docs/m1-design.md` | AI-ASSISTED | Recorded shared design decisions. Codex wrote the final documentation. | Reviewed against project requirements and team decisions. |
 | Keenan | epic.md | `.github/ISSUE_TEMPLATE/epic.md` | AI-GENERATED | Codex drafted the template based on Lecture 6. | Reviewed against Lecture 6 and checked the template structure. |
 | Keenan | user_story.md | `.github/ISSUE_TEMPLATE/user_story.md` | AI-GENERATED | Codex drafted the template based on Lecture 6. | Reviewed against Lecture 6 and checked the template structure. |
