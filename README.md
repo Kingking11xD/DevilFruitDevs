@@ -59,10 +59,31 @@ root/
 ├── data/ (Representative restaurant data)
 │   └── restaurants.json
 ├── docs/
-│   └── m1-design.md
+│   ├── m1-design.md
 │   └── PROVENANCE.md
 ├── frontend/
-│   └── frontend.py
+│   ├── public/
+│   ├── src/
+│   │   ├── api/
+│   │   │   └── restaurants.ts
+│   │   ├── assets/
+│   │   │   └── react.svg
+│   │   ├── types/
+│   │   │   └── restaurant.ts
+│   │   ├── App.css
+│   │   ├── App.tsx
+│   │   ├── index.css
+│   │   ├── main.tsx
+│   │   └── vite-env.d.ts
+│   ├── .gitignore
+│   ├── README.md
+│   ├── eslint.config.js
+│   ├── index.html
+│   ├── package.json
+│   ├── tsconfig.app.json
+│   ├── tsconfig.json
+│   ├── tsconfig.node.json
+│   └── vite.config.ts
 ├── tests/ (Automated tests) 
 ├── scrum/ (Team coordination)
 │   └── team-agreement.md
