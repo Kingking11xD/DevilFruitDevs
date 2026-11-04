@@ -1,7 +1,8 @@
 # M2 Design
 
-Version: V1  
-Last updated: November 2, 2026
+Version: V2
+
+Last updated: November 4, 2026
 
 > **Working design for team review:** These are our proposed implementation choices. This document is separate from `docs/milestones/M2.md` and the required M2 team receipt. The lab schedule lists Receipt M2.2; the M2 assignment lists Team Receipt M2.3. Confirm whether these are separate submissions or a naming error, and confirm their templates and deadlines.
 
@@ -24,8 +25,9 @@ Account and restaurant/menu repositories use the existing `read_records()` and `
 
 - Store all roles in `accounts.json`: `id`, `email`, `name`, `password_hash`, `role`, `active`, `delivery_address`, `managed_restaurant_ids`. Roles are `customer`, `restaurant_user`, `admin`.
 - Registration accepts name, email and password; always creates an active customer. Normalize email with trimming/lowercasing and enforce uniqueness. Address starts unset and is required at checkout. Trim profile text, never passwords.
-- Use Argon2 through `pwdlib` and signed bearer JWTs through `PyJWT`. Tokens contain the account ID as `sub` and expire after 30 minutes. Validate HS256 explicitly and use an environment-provided secret with no hard-coded fallback.
-- Login accepts JSON email/password and returns `access_token`, `token_type: bearer`, `expires_in: 1800`. Invalid credentials get a generic 401. The frontend keeps the token in memory; reload requires sign-in. Discarding a token locally does not revoke it before expiry.
+- Use Argon2 through `pwdlib` for password hashing. After sign-in, generate a random session token with `secrets.token_urlsafe(32)`. Keep the token's account ID and expiry in a backend dictionary. Tokens expire after 30 minutes. This uses Python's standard library and does not need PyJWT or a signing secret.
+- Keep sessions in memory in one backend process. A small lock protects the session dictionary during simultaneous requests. It does not replace or change the shared file-storage lock. Remove expired sessions when creating a new token or checking an expired token. Restarting the backend clears sessions, so customers must sign in again. Account and order data still remain saved.
+- Login accepts JSON email/password and returns `access_token`, `token_type: bearer`, `expires_in: 1800`. Invalid credentials get a generic 401. The frontend sends the token in the `Authorization: Bearer` header and keeps it in memory. Reload requires sign-in. Discarding a token locally does not revoke it before expiry.
 - Every protected request loads the current account and checks active status, role and ownership. Never expose password hashes. Profile updates change name only; address has its own operation. Email/role/ID changes and password reset are outside this slice.
 - Deactivation sets `active=false`, preserves historical records and blocks further protected use, including with an existing token. Provision restaurant/admin accounts and restaurant assignments using an explicit local setup command; no privileged public registration or committed credentials.
 

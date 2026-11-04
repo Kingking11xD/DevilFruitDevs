@@ -2,6 +2,10 @@
 
 | Student(s) | File | Path | Provenance label | AI tool, purpose, and influence | Validation |
 | --- | --- | --- | --- | --- | --- |
+| Keenan | test_account_repository.py | `tests/test_account_repository.py` | AI-ASSISTED | Codex assisted with tests for account storage, IDs, duplicate emails and failed saves. | Ran the full test suite. All 55 tests passed. |
+| Keenan | test_account_service.py | `tests/test_account_service.py` | AI-ASSISTED | Codex assisted with tests for password hashing and sign-in. | Ran the full test suite. All 55 tests passed. |
+| Keenan | test_register_customer.py | `tests/test_register_customer.py` | AI-ASSISTED | Codex assisted with registration API tests. | Ran the full test suite. All 55 tests passed. |
+| Keenan | test_auth.py | `tests/test_auth.py` | AI-ASSISTED | Codex assisted with sign-in tests and updated them for random session tokens, expiry, inactive accounts and cleared sessions. | Ran the full test suite. All 55 tests passed. |
 | Keenan | m2-design.md | `docs/m2-design.md` | AI-ASSISTED | Recorded shared design decisions. Codex wrote the final documentation. | Reviewed against project requirements and team decisions. |
 | Keenan | m1-design.md | `docs/m1-design.md` | AI-ASSISTED | Recorded shared design decisions. Codex wrote the final documentation. | Reviewed against project requirements and team decisions. |
 | Keenan | epic.md | `.github/ISSUE_TEMPLATE/epic.md` | AI-GENERATED | Codex drafted the template based on Lecture 6. | Reviewed against Lecture 6 and checked the template structure. |

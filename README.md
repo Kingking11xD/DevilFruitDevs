@@ -33,11 +33,31 @@ API documentation: `http://127.0.0.1:8000/docs`
 | GET | `/restaurants/{restaurant_id}` | View the details of a restaurant by ID |
 | POST | `/restaurants` | Create a new restaurant |
 | PATCH | `/restaurants/{restaurant_id}` | Update an existing restaurant |
+| POST | `/customers` | Register a customer account |
+| POST | `/auth/login` | Sign in and receive a session token |
 | GET | `/docs` | View the FastAPI API documentation |
 
+**Registration and sign-in:**
+
+Try both endpoints at `http://127.0.0.1:8000/docs`.
+
+- `POST /customers` takes a name, email and password. Passwords must be 12 to 128 characters and are saved as hashes.
+- `POST /auth/login` takes an email and password and returns a session token.
+
+Send the token with protected requests:
+
+    Authorization: Bearer <token>
+
+Tokens expire after 30 minutes. Restarting the backend clears them, so users must sign in again. Saved accounts remain. Run one backend process.
+
 **Data storage:**  
-Data defaults to `data/restaurants.json`. To change the folder before starting the app:  
+Restaurants are saved in `data/restaurants.json` and accounts in `data/accounts.json`. The included accounts file starts as an empty JSON list. To change the folder before starting the app:
+
+```powershell
 $env:DATA_DIR = "C:\path\to\data"
+```
+
+The selected folder must already contain the required JSON files. For a new accounts file, use `[]`. Do not replace an existing accounts file. Missing or invalid files cause an error instead of resetting saved data.
 
 **Run tests from project root with the virtual environment active:**\
 python -m pytest -v
@@ -56,10 +76,12 @@ root/
 │   │   └── json_store.py (Shared JSON storage)
 │   ├── schemas/ (Pydantic data models)
 ├── main.py (FastAPI application)
-├── data/ (Representative restaurant data)
+├── data/ (Saved application data)
+│   ├── accounts.json
 │   └── restaurants.json
 ├── docs/
 │   ├── m1-design.md
+│   ├── m2-design.md
 │   └── PROVENANCE.md
 ├── frontend/
 │   ├── public/
