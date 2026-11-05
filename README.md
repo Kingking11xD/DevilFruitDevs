@@ -35,6 +35,10 @@ API documentation: `http://127.0.0.1:8000/docs`
 | PATCH | `/restaurants/{restaurant_id}` | Update an existing restaurant |
 | POST | `/customers` | Register a customer account |
 | POST | `/auth/login` | Sign in and receive a session token |
+| GET | `/customers/me` | View your profile |
+| PATCH | `/customers/me` | Update your name |
+| PATCH | `/customers/me/address` | Update your delivery address |
+| POST | `/customers/me/deactivate` | Deactivate your account |
 | GET | `/docs` | View the FastAPI API documentation |
 
 **Registration and sign-in:**
