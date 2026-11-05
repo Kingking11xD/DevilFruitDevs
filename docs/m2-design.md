@@ -12,9 +12,9 @@ Connect **Customer -> Restaurant -> Menu -> Cart -> Checkout -> Order** through 
 | Person | Work |
 | --- | --- |
 | Keenan | Customer accounts, authentication and reusable permission checks. |
-| Unassigned | Menus, carts and cart calculations. |
-| Unassigned | Checkout, orders and shopping-state persistence. |
-| Unassigned | Frontend, API client and application wiring. |
+| Ansella | Menus, carts and cart calculations. |
+| Leyla | Checkout, orders and shopping-state persistence. |
+| Leo | Frontend, API client and application wiring. |
 
 Everyone writes tests, documents their interfaces, maintains issues/provenance and reviews PRs. Backend owners apply permission checks and resolve integration problems in their own features.
 
