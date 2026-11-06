@@ -81,34 +81,55 @@ def get_menu_item(
     response_model=MenuItem,
     status_code=status.HTTP_201_CREATED,
     summary="Add a menu item",
-    responses={404: {"description": "Restaurant not found"}},
+    responses={
+        404: {"description": "Restaurant not found"},
+        422: {"description": "Invalid menu item information"},
+        500: {"description": "Menu item data could not be saved"},
+    },
 )
 def add_menu_item(
     restaurant_id: Annotated[int, Path(gt=0)],
     body: MenuItemCreate,
-) -> dict:
+) -> dict[str, Any]:
     try:
         return service.add_menu_item(restaurant_id, body.model_dump())
-    except RestaurantNotFoundError:
-        raise HTTPException(status_code=404, detail="Restaurant not found")
+    except RestaurantNotFoundError as error:
+        raise HTTPException(status_code=404, detail=str(error)) from error
+    except (OSError, ValueError) as error:
+        raise HTTPException(
+            status_code=500,
+            detail="Menu item data could not be saved",
+        ) from error
 
 
 @router.patch(
     "/restaurants/{restaurant_id}/menu-items/{item_id}",
     response_model=MenuItem,
     summary="Update menu item",
-    responses={404: {"description": "Restaurant or menu item not found"}},
+    description=(
+        "Update fields and return the saved menu item. "
+        "Missing fields stay unchanged. "
+        "Empty updates and null values are rejected."
+    ),
+    responses={
+        404: {"description": "Restaurant or menu item not found"},
+        422: {"description": "Invalid menu item information"},
+        500: {"description": "Menu item data could not be saved"},
+    },
 )
 def update_menu_item(
     restaurant_id: Annotated[int, Path(gt=0)],
     item_id: Annotated[int, Path(gt=0)],
     body: MenuItemUpdate,
-) -> dict:
+) -> dict[str, Any]:
+    changes = body.model_dump(exclude_unset=True)
+
     try:
-        return service.update_menu_item(
-            restaurant_id, item_id, body.model_dump(exclude_none=True)
-        )
-    except RestaurantNotFoundError:
-        raise HTTPException(status_code=404, detail="Restaurant not found")
-    except MenuItemNotFoundError:
-        raise HTTPException(status_code=404, detail="Menu item not found")
+        return service.update_menu_item(restaurant_id, item_id, changes)
+    except (RestaurantNotFoundError, MenuItemNotFoundError) as error:
+        raise HTTPException(status_code=404, detail=str(error)) from error
+    except (OSError, ValueError) as error:
+        raise HTTPException(
+            status_code=500,
+            detail="Menu item data could not be saved",
+        ) from error

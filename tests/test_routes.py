@@ -497,9 +497,13 @@ def test_add_menu_item_unknown_restaurant(menu_item_files):
 @pytest.mark.parametrize("body", [
     {},
     {"name": "", "price": 100},
+    {"name": "   ", "price": 100},
     {"name": "X", "price": 0},
     {"name": "X", "price": -5},
     {"name": "X", "price": "abc"},
+    {"name": "X", "price": 100, "prcie": 100},  # typo on purpose: unknown fields must return 422
+    {"name": "X", "price": 100, "id": 99},
+    {"name": "X", "price": 100, "restaurant_id": 2},
 ])
 def test_add_menu_item_invalid_body(menu_item_files, body):
     assert client.post("/restaurants/1/menu-items", json=body).status_code == 422
@@ -541,10 +545,39 @@ def test_update_menu_item_from_another_restaurant(menu_item_files):
 
 
 @pytest.mark.parametrize("body", [
+    {},
     {"name": ""},
+    {"name": "   "},
+    {"name": None},
+    {"price": None},
+    {"available": None},
     {"price": 0},
     {"price": -5},
     {"price": "abc"},
+    {"prcie": 100},  # typo on purpose: unknown fields must return 422
+    {"id": 99},
 ])
 def test_update_menu_item_invalid_body(menu_item_files, body):
     assert client.patch("/restaurants/1/menu-items/1", json=body).status_code == 422
+
+
+def fail_to_save(*args, **kwargs):
+    raise OSError("disk full")
+
+
+def test_add_menu_item_storage_error(menu_item_files, monkeypatch):
+    monkeypatch.setattr(menu.menu_repository, "create", fail_to_save)
+
+    response = client.post("/restaurants/1/menu-items", json={"name": "Calzone", "price": 1700})
+
+    assert response.status_code == 500
+    assert response.json() == {"detail": "Menu item data could not be saved"}
+
+
+def test_update_menu_item_storage_error(menu_item_files, monkeypatch):
+    monkeypatch.setattr(menu.menu_repository, "update", fail_to_save)
+
+    response = client.patch("/restaurants/1/menu-items/1", json={"price": 1900})
+
+    assert response.status_code == 500
+    assert response.json() == {"detail": "Menu item data could not be saved"}
