@@ -60,10 +60,13 @@ def test_sign_in(account: dict[str, Any], protected_client: TestClient) -> None:
     assert session["account_id"] == account["id"]
     assert before + timedelta(minutes=30) <= session["expires_at"] <= datetime.now(timezone.utc) + timedelta(minutes=30)
     assert "expired" not in token_service.sessions
+    token_service.sessions["expired"] = {
+        "account_id": account["id"], "expires_at": before - timedelta(minutes=1)}
     protected = protected_client.get(
         "/protected", headers={"Authorization": f"Bearer {result['access_token']}"})
     assert protected.status_code == 200
     assert protected.json() == {"id": account["id"]}
+    assert "expired" not in token_service.sessions
 
 
 def test_invalid_sign_in(account: dict[str, Any]) -> None:

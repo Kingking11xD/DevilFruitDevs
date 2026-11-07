@@ -10,14 +10,18 @@ sessions: dict[str, dict[str, Any]] = {}
 session_lock = Lock()
 
 
+def _remove_expired_sessions(now: datetime) -> None:
+    for token, session in list(sessions.items()):
+        if session["expires_at"] <= now:
+            del sessions[token]
+
+
 def create_access_token(account_id: int) -> str:
     now = datetime.now(timezone.utc)
 
     # requests can run at the same time so protect changes to the sessions
     with session_lock:
-        for token, session in list(sessions.items()):
-            if session["expires_at"] <= now:
-                del sessions[token]
+        _remove_expired_sessions(now)
 
         token = secrets.token_urlsafe(32)
         sessions[token] = {
@@ -28,12 +32,9 @@ def create_access_token(account_id: int) -> str:
 
 def read_account_id(token: str) -> int:
     with session_lock:
+        _remove_expired_sessions(datetime.now(timezone.utc))
         session = sessions.get(token)
         if session is None:
-            raise InvalidCredentialsError("Invalid authentication")
-
-        if session["expires_at"] <= datetime.now(timezone.utc):
-            del sessions[token]
             raise InvalidCredentialsError("Invalid authentication")
 
         return session["account_id"]
