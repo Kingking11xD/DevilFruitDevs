@@ -1,0 +1,50 @@
+from pathlib import Path
+from typing import Any
+
+from app.repositories.json_store import data_path, read_records, update_records
+
+
+class MenuRepo:
+
+    def __init__(self, file_path: str | Path | None = None) -> None:
+        self.file_path = (
+            Path(file_path) if file_path is not None else data_path("menu_items.json")
+        )
+
+    def get_all(self) -> list[dict[str, Any]]:
+        return read_records(self.file_path)
+
+    def get_by_id(self, item_id: int) -> dict[str, Any] | None:
+        for item in self.get_all():
+            if item["id"] == item_id:
+                return item
+
+        return None
+
+    def get_by_restaurant_id(
+        self, restaurant_id: int
+    ) -> list[dict[str, Any]]:
+        return [
+            item
+            for item in self.get_all()
+            if item["restaurant_id"] == restaurant_id
+        ]
+
+    def create(self, restaurant_id: int, data: dict[str, Any]) -> dict[str, Any]:
+        def add(records: list[dict]) -> dict[str, Any]:
+            new_id = max((r["id"] for r in records), default=0) + 1
+            item = {"id": new_id, "restaurant_id": restaurant_id, **data}
+            records.append(item)
+            return item
+
+        return update_records(self.file_path, add)
+
+    def update(self, item_id: int, changes: dict[str, Any]) -> dict[str, Any] | None:
+        def apply(records: list[dict]) -> dict[str, Any] | None:
+            for record in records:
+                if record["id"] == item_id:
+                    record.update(changes)
+                    return record
+            return None
+
+        return update_records(self.file_path, apply)

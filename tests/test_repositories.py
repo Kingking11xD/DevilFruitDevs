@@ -7,6 +7,7 @@ import pytest
 
 from app.repositories.json_store import data_path, read_records, update_records
 from app.repositories.restaurant_repo import RestaurantRepo
+from app.repositories.menu_repo import MenuRepo
 
 
 def test_get_all_restaurants(tmp_path):
@@ -16,23 +17,22 @@ def test_get_all_restaurants(tmp_path):
         {"id": 3, "name": "Burger", "cuisine": "South Canada", "address": "20 Main St"}
     ]
 
-    temp_path = tmp_path / "restaurants.json" 
-    temp_path.write_text(json.dumps(expected), encoding="utf-8") 
+    temp_path = tmp_path / "restaurants.json"
+    temp_path.write_text(json.dumps(expected), encoding="utf-8")
 
     repository = RestaurantRepo(temp_path)
-    result = repository.get_all() 
+    result = repository.get_all()
 
-    assert result == expected # Does the loaded data match what we saved?
+    assert result == expected  # Does the loaded data match what we saved?
 
 
 def test_invalid_json(tmp_path):
     temp_path = tmp_path / "invalid.json"
     temp_path.write_text("Large bags heavy bags danger cats", encoding="utf-8")
-    #temp_path.write_text('[{"id": 1, "name": "Kebab", "cuisine": "Turkish"}]', encoding="utf-8") # A valid example
 
     repository = RestaurantRepo(temp_path)
 
-    with pytest.raises(json.JSONDecodeError): # Temporarily check for and expect a JSON decode error
+    with pytest.raises(json.JSONDecodeError):
         repository.get_all()
 
 
@@ -58,6 +58,90 @@ def test_get_by_id(tmp_path: Path) -> None:
     assert repository.get_by_id(999) is None
 
 
+def test_get_menu_by_restaurant_id(tmp_path: Path) -> None:
+    data = [
+        {
+            "id": 1,
+            "restaurant_id": 1,
+            "name": "Margherita Pizza",
+            "price": 1600,
+            "available": True,
+        },
+        {
+            "id": 2,
+            "restaurant_id": 2,
+            "name": "Tacos al Pastor",
+            "price": 1400,
+            "available": True,
+        },
+        {
+            "id": 3,
+            "restaurant_id": 1,
+            "name": "Garlic Bread",
+            "price": 800,
+            "available": False,
+        },
+    ]
+
+    file_path = tmp_path / "menu_items.json"
+    file_path.write_text(json.dumps(data), encoding="utf-8")
+
+    repository = MenuRepo(file_path)
+
+    result = repository.get_by_restaurant_id(1)
+
+    assert result == [data[0], data[2]]
+    assert repository.get_by_restaurant_id(999) == []
+
+
+def test_menu_get_by_id(tmp_path: Path) -> None:
+    data = [
+        {"id": 1, "restaurant_id": 1, "name": "Pizza", "price": 1600, "available": True},
+    ]
+    file_path = tmp_path / "menu_items.json"
+    file_path.write_text(json.dumps(data), encoding="utf-8")
+
+    repository = MenuRepo(file_path)
+
+    assert repository.get_by_id(1) == data[0]
+    assert repository.get_by_id(999) is None
+
+
+def test_menu_repo_missing_file(tmp_path: Path) -> None:
+    repository = MenuRepo(tmp_path / "missing.json")
+
+    with pytest.raises(FileNotFoundError):
+        repository.get_all()
+
+
+def test_menu_repo_default_path_uses_data_dir(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    monkeypatch.setenv("DATA_DIR", str(tmp_path))
+
+    assert MenuRepo().file_path == tmp_path / "menu_items.json"
+
+def test_menu_repo_create_assigns_next_id(tmp_path):
+    path = tmp_path / "menu_items.json"
+    path.write_text("[]")
+    repo = MenuRepo(path)
+    first = repo.create(1, {"name": "Soup", "price": 500, "available": True})
+    second = repo.create(2, {"name": "Tea", "price": 200, "available": True})
+    assert first["id"] == 1
+    assert second["id"] == 2
+    assert len(repo.get_all()) == 2
+
+def test_menu_repo_update(tmp_path):
+    path = tmp_path / "menu_items.json"
+    path.write_text(
+        json.dumps([{"id": 1, "restaurant_id": 1, "name": "A", "price": 100, "available": True}])
+    )
+    repo = MenuRepo(path)
+    updated = repo.update(1, {"price": 250})
+    assert updated["price"] == 250
+    assert updated["name"] == "A"
+    assert repo.get_by_id(1)["price"] == 250
+    assert repo.update(99, {"price": 1}) is None
 def test_save_records(tmp_path: Path) -> None:
     path = tmp_path / "restaurants.json"
     path.write_text('[{"id": 1}]', encoding="utf-8")  # Start with one saved record
