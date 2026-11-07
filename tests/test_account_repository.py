@@ -68,6 +68,16 @@ def test_update_account(repository: AccountRepo) -> None:
     assert reloaded.get_by_id(other["id"]) == other
     assert repository.update(999, {"name": "Missing"}) is None
 
+    before = repository.file_path.read_bytes()
+
+    for changes in [
+            {"role": "admin"}, {"id": 99}, {"active": True},
+            {"name": "vegeta", "email": "vegeta@email.com"}]:
+        with pytest.raises(ValueError):
+            repository.update(account["id"], changes)
+
+        assert repository.file_path.read_bytes() == before
+
 
 def test_failed_save_keeps_accounts(
         repository: AccountRepo, monkeypatch: pytest.MonkeyPatch) -> None:

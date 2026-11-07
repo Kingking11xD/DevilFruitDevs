@@ -4,6 +4,7 @@ import pytest
 from fastapi.testclient import TestClient
 
 from app.api import dependencies
+from app.repositories.json_store import update_records
 from app.services import token_service
 from main import app
 
@@ -47,6 +48,11 @@ def test_profile_changes(client: TestClient) -> None:
     assert response.status_code == 200
     assert response.json()["active"] is False
     assert client.get("/customers/me").status_code == 403
+    assert client.post("/auth/login", json={
+        "email": "JimBOB@email.com", "password": "test-pw-jimbob"}).status_code == 403
+    assert client.patch("/customers/me", json={"name": "vegeta"}).status_code == 403
+    assert client.patch("/customers/me/address", json={
+        "delivery_address": "456 Test Street"}).status_code == 403
 
 
 def test_invalid_profile_requests(client: TestClient) -> None:
@@ -56,7 +62,10 @@ def test_invalid_profile_requests(client: TestClient) -> None:
     assert client.patch("/customers/me", json={
         "name": "vegeta", "role": "admin"}).status_code == 422
 
-    dependencies.repository.update(1, {"role": "admin"})
+    def make_admin(records: list[dict]) -> None:
+        records[0]["role"] = "admin"
+
+    update_records(dependencies.repository.file_path, make_admin)
     assert client.get("/customers/me").status_code == 403
 
     client.headers.pop("Authorization")
