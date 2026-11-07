@@ -24,3 +24,17 @@ class AccountCreate(BaseModel):
     @classmethod
     def normalize_email(cls, value: str) -> str:
         return value.lower()
+
+
+class AccountUpdate(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    name: Annotated[str, StringConstraints(
+        strip_whitespace=True, min_length=1, max_length=100)]
+
+
+class AddressUpdate(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    delivery_address: Annotated[str, StringConstraints(
+        strip_whitespace=True, min_length=1, max_length=500)]

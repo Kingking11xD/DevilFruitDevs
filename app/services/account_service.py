@@ -57,3 +57,22 @@ class AccountService:
             raise InactiveAccountError("Account is inactive")
 
         return account
+
+    def update_name(self, account_id: int, name: str) -> dict[str, Any]:
+        return self._update_account(account_id, {"name": name.strip()})
+
+    def update_address(self, account_id: int, address: str) -> dict[str, Any]:
+        return self._update_account(
+            account_id, {"delivery_address": address.strip()})
+
+    def deactivate(self, account_id: int) -> dict[str, Any]:
+        return self._update_account(account_id, {"active": False})
+
+    def _update_account(self, account_id: int, changes: dict[str, Any]) -> dict[str, Any]:
+        self.get_active_account(account_id)
+        account = self.repository.update(account_id, changes)
+
+        if account is None:
+            raise InvalidCredentialsError("Invalid authentication")
+
+        return account

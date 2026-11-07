@@ -59,3 +59,21 @@ class AccountRepo:
             return new_account
 
         return update_records(self.file_path, add_account)
+
+    def update(self, account_id: int, changes: dict[str, Any]) -> dict[str, Any] | None:
+        for field in changes:
+            if field not in {"name", "delivery_address", "active"}:
+                raise ValueError("Account field cannot be updated")
+
+        if "active" in changes and changes["active"] is not False:
+            raise ValueError("Account can only be deactivated")
+
+        def update_account(records: list[dict]) -> dict[str, Any] | None:
+            for account in records:
+                if account["id"] == account_id:
+                    account.update(changes)
+                    return account
+
+            return None
+
+        return update_records(self.file_path, update_account)
