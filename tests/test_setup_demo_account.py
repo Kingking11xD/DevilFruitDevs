@@ -1,4 +1,5 @@
 from pathlib import Path
+from subprocess import CompletedProcess
 
 import pytest
 
@@ -94,3 +95,38 @@ def test_storage_error(
         assert not path.exists()
     else:
         assert path.read_text(encoding="utf-8") == contents
+
+
+def test_demo_mode(data_dir: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    seed = data_dir / "data"
+    seed.mkdir()
+    (seed / "restaurants.json").write_text('[{"id": 17}]', encoding="utf-8")
+    (seed / "menu_items.json").write_text("[]", encoding="utf-8")
+    demo_dir = data_dir / "demo"
+    monkeypatch.setattr(setup_demo_account, "PROJECT_ROOT", data_dir)
+    monkeypatch.setattr(setup_demo_account, "DEMO_DIR", demo_dir)
+    launches = []
+
+    def start_backend(command: list[str], cwd: Path, env: dict) -> CompletedProcess:
+        assert command[1:4] == ["-m", "uvicorn", "main:app"]
+        assert cwd == data_dir
+        assert env["DATA_DIR"] == str(demo_dir)
+        launches.append(command)
+        return CompletedProcess(command, 0)
+
+    monkeypatch.setattr(setup_demo_account.subprocess, "run", start_backend)
+    assert setup_demo_account.main(["--demo"]) == 0
+    accounts = AccountRepo(demo_dir / "accounts.json")
+    assert accounts.get_by_email("bulma@email.com")["role"] == "admin"
+    vegeta = accounts.get_by_email("vegeta@email.com")
+    assert vegeta["role"] == "restaurant_user"
+    assert vegeta["managed_restaurant_ids"] == [17]
+    before = {path.name: path.read_bytes() for path in demo_dir.iterdir()}
+
+    def unexpected_password(prompt: str) -> str:
+        raise AssertionError("Existing accounts should keep their passwords")
+
+    monkeypatch.setattr(setup_demo_account, "getpass", unexpected_password)
+    assert setup_demo_account.main(["--demo"]) == 0
+    assert before == {path.name: path.read_bytes() for path in demo_dir.iterdir()}
+    assert len(launches) == 2

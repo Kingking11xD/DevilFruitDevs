@@ -2,9 +2,9 @@
 
 | Student(s) | File | Path | Provenance label | AI tool, purpose, and influence | Validation |
 | --- | --- | --- | --- | --- | --- |
-| Keenan | README.md | `README.md` | AI-ASSISTED | Codex reformatted and updated demo account setup instructions and permission helper examples. | Checked against the command and helper implementations. |
+| Keenan | README.md | `README.md` | AI-ASSISTED | Codex helped simplify setup instructions to use the single --demo command and explain passwords, sign-in and saved demo data. Also helped with permission helper examples. | Checked against the command and helper implementations. |
 | Keenan | test_permissions.py | `tests/test_permissions.py` | AI-ASSISTED | Codex helped inform tests for roles, ownership, restaurant access and inactive accounts. | Ran the full test suite. All 144 tests passed. Reviewed test logic. |
-| Keenan | test_setup_demo_account.py | `tests/test_setup_demo_account.py` | AI-ASSISTED | Codex helped refactor service tests for demo setup, sign-in, invalid input and existing data protection. | Ran the full test suite. All 144 tests passed. Reviewed test logic. |
+| Keenan | test_setup_demo_account.py | `tests/test_setup_demo_account.py` | AI-ASSISTED | Codex helped combine setup tests and add one demo-mode test. | Ran the full test suite. All 145 tests passed, including 8 setup cases. Reviewed test logic. |
 | Keenan | test_account_repository.py | `tests/test_account_repository.py` | AI-ASSISTED | Codex helped write tests for account storage, IDs, duplicate emails, updates and failed saves. | Ran the full test suite. All 59 tests passed. Reviewed test logic. |
 | Keenan | test_account_service.py | `tests/test_account_service.py` | AI-ASSISTED | Codex helped write and simplify tests for password hashing, sign-in, profile changes and deactivation. | Ran the full test suite. All 59 tests passed. Reviewed test logic. |
 | Keenan | test_customer_profile.py | `tests/test_customer_profile.py` | AI-ASSISTED | Codex helped write and simplify profile API tests. | Ran the full test suite. All 59 tests passed. Reviewed test logic. |

@@ -52,14 +52,17 @@ Send the token with protected requests:
 
 Tokens expire after 30 minutes. Restarting the backend clears them, so users must sign in again. Saved accounts remain. Run one backend process.
 
-For local admin and restaurant-user demos, use a `DATA_DIR` outside the repository (see below), then run from the project root:
+For a local demo, activate your Python environment, stop any running backend, and run from the project root:
 
 ```powershell
-python setup_demo_account.py --name "Bulma" --email "bulma@email.com" --role admin
-python setup_demo_account.py --name "Vegeta" --email "vegeta@email.com" --role restaurant_user --restaurant-id 1
+python setup_demo_account.py --demo
 ```
 
-Enter the hidden password twice then sign in through `/auth/login`. Restaurant IDs must exist. Repeat `--restaurant-id` for more assignments. Duplicate emails are rejected. Keep demo accounts out of commits. Public registration still creates customers only.
+The command prepares data in `.devilfruitdevs-demo` inside your user folder and starts the backend automatically. No `DATA_DIR` setup is needed.
+
+On the first run, choose a 12-128 character password and enter it twice (typing is hidden). Open `http://127.0.0.1:8000/docs` and use `POST /auth/login` with `bulma@email.com` (admin) or `vegeta@email.com` (restaurant user) and that password. Vegeta is assigned to the first restaurant in the demo data.
+
+Later runs keep existing data and passwords. Press Ctrl+C to stop. For custom account options, run `python setup_demo_account.py --help`. Public registration still creates customers only.
 
 For permissions routes can use `Depends(get_current_admin)` or `Depends(get_restaurant_manager)` from `app/api/dependencies.py`. Services can use `require_owner(account, customer_id)` from `app/services/permissions.py`. Map ownership failures to 404. Invalid tokens return 401 and blocked access returns 403. Feature owners still need to connect and test these helpers on their endpoints.
 
