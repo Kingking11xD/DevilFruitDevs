@@ -17,8 +17,9 @@ DEMO_DIR = Path.home() / ".devilfruitdevs-demo"
 
 def read_password() -> str:
     # prompt instead of putting the password in command history
-    password = getpass("Password (12-128 characters): ")
-    if password != getpass("Confirm password: "):
+    options = {"echo_char": "*"} if sys.version_info >= (3, 14) else {}
+    password = getpass("Password (12-128 characters): ", **options)
+    if password != getpass("Confirm password: ", **options):
         raise DemoAccountError("Passwords do not match.")
     return password
 

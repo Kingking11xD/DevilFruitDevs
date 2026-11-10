@@ -18,7 +18,7 @@ def data_dir(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> Path:
     (tmp_path / "restaurants.json").write_text('[{"id": 1}, {"id": 2}]', encoding="utf-8")
     monkeypatch.setenv("DATA_DIR", str(tmp_path))
 
-    def password(prompt: str) -> str:
+    def password(prompt: str, *, echo_char: str | None = None) -> str:
         return PASSWORD
 
     monkeypatch.setattr(setup_demo_account, "getpass", password)
@@ -64,7 +64,7 @@ def test_invalid_setup(
         passwords: list[str], restaurant_id: int, message: str) -> None:
     answers = iter(passwords)
 
-    def password(prompt: str) -> str:
+    def password(prompt: str, *, echo_char: str | None = None) -> str:
         return next(answers)
 
     monkeypatch.setattr(setup_demo_account, "getpass", password)
@@ -123,7 +123,7 @@ def test_demo_mode(data_dir: Path, monkeypatch: pytest.MonkeyPatch) -> None:
     assert vegeta["managed_restaurant_ids"] == [17]
     before = {path.name: path.read_bytes() for path in demo_dir.iterdir()}
 
-    def unexpected_password(prompt: str) -> str:
+    def unexpected_password(prompt: str, *, echo_char: str | None = None) -> str:
         raise AssertionError("Existing accounts should keep their passwords")
 
     monkeypatch.setattr(setup_demo_account, "getpass", unexpected_password)

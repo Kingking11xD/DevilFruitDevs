@@ -60,7 +60,7 @@ python setup_demo_account.py --demo
 
 The command prepares data in `.devilfruitdevs-demo` inside your user folder and starts the backend automatically. No `DATA_DIR` setup is needed.
 
-On the first run, choose a 12-128 character password and enter it twice (typing is hidden). Open `http://127.0.0.1:8000/docs` and use `POST /auth/login` with `bulma@email.com` (admin) or `vegeta@email.com` (restaurant user) and that password. Vegeta is assigned to the first restaurant in the demo data.
+On the first run, choose a 12-128 character password and enter it twice. Password typing shows stars on Python 3.14+ and stays hidden on older versions. Open `http://127.0.0.1:8000/docs` and use `POST /auth/login` with `bulma@email.com` (admin) or `vegeta@email.com` (restaurant user) and that password. Vegeta is assigned to the first restaurant in the demo data.
 
 Later runs keep existing data and passwords. Press Ctrl+C to stop. For custom account options, run `python setup_demo_account.py --help`. Public registration still creates customers only.
 
