@@ -489,3 +489,34 @@ def test_cart_repo_concurrent_create(
     else:
         assert results[0][0]["id"] != results[1][0]["id"]
         assert all(created for _, created in results)
+
+def test_cart_repo_concurrent_modify(tmp_path: Path) -> None:
+    """Test that simultaneous item changes are both saved."""
+    path = tmp_path / "shopping.json"
+    path.write_text(
+        json.dumps({"carts": [], "orders": []}),
+        encoding="utf-8",
+    )
+
+    repo = CartRepo(path)
+    cart, _ = repo.create(customer_id=1)
+
+    def add_item(menu_item_id: int) -> None:
+        """Add a menu item to the latest saved cart."""
+        def change(current_cart: dict) -> None:
+            """Add the item to the cart's existing items."""
+            current_cart["items"].append(
+                {"menu_item_id": menu_item_id, "quantity": 1}
+            )
+
+        repo.modify(cart["id"], change)
+
+    with ThreadPoolExecutor(max_workers=2) as workers:
+        list(workers.map(add_item, [5, 10]))
+
+    saved_cart = repo.get_by_id(cart["id"])
+
+    assert len(saved_cart["items"]) == 2
+    assert sorted(
+        item["menu_item_id"] for item in saved_cart["items"]
+    ) == [5, 10]

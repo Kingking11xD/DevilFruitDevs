@@ -1,3 +1,4 @@
+from collections.abc import Callable
 from pathlib import Path
 from typing import Any
 
@@ -77,4 +78,30 @@ class CartRepo:
                 
             return None
         
+        return update_shopping(self.file_path, apply)
+    
+    def modify(
+            self, cart_id, change: Callable[[dict[str, Any]], Any]
+    ) -> dict[str, Any] | None:
+        """Safely modify the latest cart data before saving it."""
+        
+        def apply(shopping: dict[str, Any]) -> dict[str, Any] | None:
+            """Find the cart and apply the changes."""
+            for cart in shopping["carts"]:
+                if cart["id"] == cart_id:
+                    original_id = cart["id"]
+                    original_customer_id = cart["customer_id"]
+
+                    change(cart)
+
+                    if (
+                        cart["id"] != original_id
+                        or cart["customer_id"] != original_customer_id
+                    ):
+                        raise ValueError("Can't update protected cart fields")
+                    
+                    return cart
+                
+            return None
+            
         return update_shopping(self.file_path, apply)
