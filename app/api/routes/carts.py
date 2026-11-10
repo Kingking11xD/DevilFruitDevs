@@ -11,7 +11,22 @@ from app.schemas.cart import Cart
 router = APIRouter()
 repository = CartRepo()
 
-@router.post("/customers/me/cart", response_model=Cart)
+@router.post(
+    "/customers/me/cart",
+    response_model=Cart,
+    status_code=201,
+    summary="Create or retrieve active cart",
+    description=(
+        "Create an active cart for the signed in customer, or return "
+        "their existing active cart without creating a duplicate."
+    ),
+    responses={
+        200: {"description": "Existing active cart returned"},
+        401: {"description": "Authentication required"},
+        403: {"description": "Customer account is inactive or unauthorized"},
+        500: {"description": "Cart storage is unavailable"},
+    },
+)
 def create_cart(
     account: Annotated[dict[str, Any], Depends(get_current_customer)],
     response: Response,
@@ -30,7 +45,21 @@ def create_cart(
     )
     return Cart.model_validate(cart)
 
-@router.get("/customers/me/cart", response_model=Cart)
+@router.get(
+    "/customers/me/cart",
+    response_model=Cart,
+    summary="Get active cart",
+    description=(
+        "Retrieve the signed in customer's active cart."
+        "This endpoint doesn't create a new cart."
+    ),
+    responses={
+        401: {"description": "Authentication required"},
+        403: {"description": "Customer account is inactive or unauthorized"},
+        404: {"description": "Active cart not found"},
+        500: {"description": "Cart storage is unavailable"},
+    },
+)
 def get_cart(
     account: Annotated[dict[str, Any], Depends(get_current_customer)],
 ) -> Cart:
