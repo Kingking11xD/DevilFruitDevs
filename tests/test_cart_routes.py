@@ -7,6 +7,7 @@ from main import app
 from app.api import dependencies
 from app.api.routes import carts
 from app.services import token_service
+from app.repositories.cart_repo import CartRepo
 
 @pytest.fixture
 def client(tmp_path, monkeypatch):
@@ -121,3 +122,33 @@ def test_cart_storage_error(client):
     assert get_response.json() == {
         "detail": "Cart storage is unavailable"
     }
+
+def test_deactivated_customer_cannot_access_cart(client):
+    """Reject cart request from a deactivated customer."""
+    created = client.post("/customers/me/cart")
+    assert created.status_code == 201
+
+    deactivated = client.post("/customers/me/deactivate")
+    assert deactivated.status_code == 200
+
+    post_response = client.post("/customers/me/cart")
+    get_response = client.get("/customers/me/cart")
+
+    assert post_response.status_code == 403
+    assert post_response.json()["detail"] == "Account is inactive"
+
+    assert get_response.status_code == 403
+    assert get_response.json()["detail"] == "Account is inactive"
+
+def test_cart_persists_after_restart(client):
+    """Verify that a cart remains saved in storage."""
+    created = client.post("/customers/me/cart")
+    assert created.status_code == 201
+
+    saved_cart = CartRepo(
+        carts.repository.file_path
+    ).get_active_for_customer(created.json()["customer_id"])
+
+    assert saved_cart is not None
+    assert saved_cart["id"] == created.json()["id"]
+    assert saved_cart["status"] == "active"
