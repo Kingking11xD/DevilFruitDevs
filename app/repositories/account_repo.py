@@ -33,6 +33,26 @@ class AccountRepo:
         return None
 
     def create(self, name: str, email: str, password_hash: str) -> dict[str, Any]:
+        return self._create(name, email, password_hash, "customer", [])
+
+    def create_staff(
+            self, name: str, email: str, password_hash: str,
+            role: str, restaurant_ids: list[int]) -> dict[str, Any]:
+        if role not in {"admin", "restaurant_user"}:
+            raise ValueError("Staff role must be admin or restaurant_user")
+
+        if role == "admin" and restaurant_ids:
+            raise ValueError("Admins do not need restaurant assignments")
+
+        for restaurant_id in restaurant_ids:
+            if type(restaurant_id) is not int or restaurant_id <= 0:
+                raise ValueError("Restaurant IDs must be positive integers")
+
+        return self._create(name, email, password_hash, role, restaurant_ids)
+
+    def _create(
+            self, name: str, email: str, password_hash: str,
+            role: str, restaurant_ids: list[int]) -> dict[str, Any]:
         email = email.strip().lower()
 
         def add_account(records: list[dict]) -> dict[str, Any]:
@@ -50,10 +70,10 @@ class AccountRepo:
                 "name": name,
                 "email": email,
                 "password_hash": password_hash,
-                "role": "customer",
+                "role": role,
                 "active": True,
                 "delivery_address": None,
-                "managed_restaurant_ids": []}
+                "managed_restaurant_ids": restaurant_ids.copy()}
 
             records.append(new_account)
             return new_account

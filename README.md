@@ -19,8 +19,6 @@ After running the application open another terminal\
 cd frontend \
 npm run dev
 
-
-
 **API endpoints:**   
 Health check: `http://127.0.0.1:8000/health`  
 Restaurant list: `http://127.0.0.1:8000/restaurants`  
@@ -53,6 +51,17 @@ Send the token with protected requests:
     Authorization: Bearer <token>
 
 Tokens expire after 30 minutes. Restarting the backend clears them, so users must sign in again. Saved accounts remain. Run one backend process.
+
+For local admin and restaurant-user demos, use a `DATA_DIR` outside the repository (see below), then run from the project root:
+
+```powershell
+python setup_demo_account.py --name "Bulma" --email "bulma@email.com" --role admin
+python setup_demo_account.py --name "Vegeta" --email "vegeta@email.com" --role restaurant_user --restaurant-id 1
+```
+
+Enter the hidden password twice then sign in through `/auth/login`. Restaurant IDs must exist. Repeat `--restaurant-id` for more assignments. Duplicate emails are rejected. Keep demo accounts out of commits. Public registration still creates customers only.
+
+For permissions routes can use `Depends(get_current_admin)` or `Depends(get_restaurant_manager)` from `app/api/dependencies.py`. Services can use `require_owner(account, customer_id)` from `app/services/permissions.py`. Map ownership failures to 404. Invalid tokens return 401 and blocked access returns 403. Feature owners still need to connect and test these helpers on their endpoints.
 
 **Data storage:**  
 Restaurants are saved in `data/restaurants.json` and accounts in `data/accounts.json`. The included accounts file starts as an empty JSON list. To change the folder before starting the app:

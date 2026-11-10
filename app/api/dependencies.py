@@ -6,6 +6,8 @@ from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 from app.repositories.account_repo import AccountRepo
 from app.services.account_service import (
     AccountService, InactiveAccountError, InvalidCredentialsError)
+from app.services.permissions import (
+    PermissionDeniedError, require_restaurant_access, require_role)
 from app.services.token_service import read_account_id
 
 repository = AccountRepo()
@@ -35,7 +37,30 @@ def get_current_account(
 
 def get_current_customer(
         account: Annotated[dict[str, Any], Depends(get_current_account)]) -> dict[str, Any]:
-    if account["role"] != "customer":
-        raise HTTPException(status_code=403, detail="Customer account required")
+    try:
+        require_role(account, {"customer"})
+    except PermissionDeniedError as error:
+        raise HTTPException(status_code=403, detail="Customer account required") from error
+
+    return account
+
+
+def get_current_admin(
+        account: Annotated[dict[str, Any], Depends(get_current_account)]) -> dict[str, Any]:
+    try:
+        require_role(account, {"admin"})
+    except PermissionDeniedError as error:
+        raise HTTPException(status_code=403, detail="Administrator account required") from error
+
+    return account
+
+
+def get_restaurant_manager(
+        restaurant_id: int,
+        account: Annotated[dict[str, Any], Depends(get_current_account)]) -> dict[str, Any]:
+    try:
+        require_restaurant_access(account, restaurant_id)
+    except PermissionDeniedError as error:
+        raise HTTPException(status_code=403, detail=str(error)) from error
 
     return account
