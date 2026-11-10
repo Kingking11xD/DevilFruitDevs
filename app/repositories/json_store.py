@@ -31,8 +31,31 @@ def _read(path: Path) -> list[dict]:
 
     return records
 
+def _read_shopping(path: Path) -> dict[str, list[dict]]:
+    """Read and validates the shared shopping JSON file."""
+    with path.open("r", encoding="utf-8") as file:
+        shopping = json.load(file)
 
-def _save(path: Path, records: list[dict]) -> None:
+    if not isinstance(shopping, dict):
+        raise ValueError("Expected a JSON shopping object")
+
+    if set(shopping) != {"carts", "orders"}:
+        raise ValueError("Expected carts and orders in shopping data")
+
+    for records in shopping.values():
+        if not isinstance(records, list):
+            raise ValueError("Expected a JSON list of records")
+
+        for record in records:
+            if not isinstance(record, dict):
+                raise ValueError("Each record must be a JSON object")
+
+    return shopping
+
+
+def _save(
+        path: Path, records: list[dict] | dict[str, list[dict]]
+) -> None:
     temporary_path = None
     try:
         with NamedTemporaryFile(
@@ -58,6 +81,12 @@ def read_records(path: str | Path) -> list[dict]:
     with _storage_lock:
         return _read(path)
 
+def read_shopping(path: str | Path) -> dict[str, list[dict]]:
+    """Safely read and return the shopping cart and order data."""
+    path = Path(path).resolve()
+
+    with _storage_lock:
+        return _read_shopping(path)
 
 def update_records(
     path: str | Path,
@@ -70,4 +99,17 @@ def update_records(
         records = _read(path)
         result = change(records) # The repository changes this list while the storage lock is held
         _save(path, records)
+        return result
+
+def update_shopping(
+        path: str | Path,
+        change: Callable[[dict[str, list[dict]]], Any],
+) -> Any:
+    """Safely update and save shopping cart and order data."""
+    path = Path(path).resolve()
+
+    with _storage_lock:
+        shopping = _read_shopping(path)
+        result = change(shopping)
+        _save(path, shopping)
         return result
