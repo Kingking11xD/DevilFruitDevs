@@ -104,3 +104,20 @@ def test_get_cart_requires_authentication(client):
 
     assert response.status_code == 401
     assert response.json()["detail"] == "Authentication required"
+
+def test_cart_storage_error(client):
+    """Return 500 when the cart storage contains invalid JSON."""
+    carts.repository.file_path.write_text("{invalid json}")
+
+    post_response = client.post("/customers/me/cart")
+    get_response = client.get("/customers/me/cart")
+
+    assert post_response.status_code == 500
+    assert post_response.json() == {
+        "detail": "Cart storage is unavailable"
+    }
+
+    assert get_response.status_code == 500
+    assert get_response.json() == {
+        "detail": "Cart storage is unavailable"
+    }
