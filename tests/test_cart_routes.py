@@ -77,3 +77,30 @@ def test_create_cart_requires_authentication(client):
 
     assert response.status_code == 401
     assert response.json()["detail"] == "Authentication required"
+
+def test_get_existing_cart(client):
+    """Return the customer's existing active cart."""
+    created = client.post("/customers/me/cart")
+
+    response = client.get("/customers/me/cart")
+
+    assert created.status_code == 201
+    assert response.status_code == 200
+    assert response.json() == created.json()
+
+def test_get_cart_not_found(client):
+    """Return 404 when the customer has no active cart."""
+    response = client.get("/customers/me/cart")
+
+    assert response.status_code == 404
+    assert response.json()["detail"] == "Active cart not found"
+    assert carts.repository.get_all() == []
+
+def test_get_cart_requires_authentication(client):
+    """Reject requests from customers who are not signed in."""
+    client.headers.pop("Authorization")
+
+    response = client.get("/customers/me/cart")
+
+    assert response.status_code == 401
+    assert response.json()["detail"] == "Authentication required"
