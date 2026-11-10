@@ -56,6 +56,22 @@ def test_order_model_invalid(field: str, value) -> None:
     with pytest.raises(ValidationError):
         Order(**data)
 
+def test_order_model_rejects_wrong_subtotal() -> None:
+    """Test that an order whose subtotal doesn't match its items is rejected."""
+    data = valid_order_data()
+    data["subtotal"] = 2000
+ 
+    with pytest.raises(ValidationError):
+        Order(**data)
+ 
+def test_order_item_rejects_wrong_line_total() -> None:
+    """Test that an item whose line total isn't price times quantity is rejected."""
+    data = valid_order_data()["items"][0]
+    data["line_total"] = 1250
+ 
+    with pytest.raises(ValidationError):
+        OrderItem(**data)
+ 
 
 @pytest.mark.parametrize(
     "field, value",
