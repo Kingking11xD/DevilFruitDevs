@@ -55,9 +55,33 @@ def test_duplicate_email_keeps_data(repository: AccountRepo) -> None:
     assert repository.file_path.read_bytes() == before
 
 
+def test_update_account(repository: AccountRepo) -> None:
+    account = repository.create("JimBOB", "JimBOB@email.com", "test-pw")
+    other = repository.create("vegeta", "vegeta@email.com", "test-pw")
+    expected = {**account, "name": "Ram Altman"}
+
+    updated = repository.update(account["id"], {"name": "Ram Altman"})
+
+    assert updated == expected
+    reloaded = AccountRepo(repository.file_path)
+    assert reloaded.get_by_id(account["id"]) == expected
+    assert reloaded.get_by_id(other["id"]) == other
+    assert repository.update(999, {"name": "Missing"}) is None
+
+    before = repository.file_path.read_bytes()
+
+    for changes in [
+            {"role": "admin"}, {"id": 99}, {"active": True},
+            {"name": "vegeta", "email": "vegeta@email.com"}]:
+        with pytest.raises(ValueError):
+            repository.update(account["id"], changes)
+
+        assert repository.file_path.read_bytes() == before
+
+
 def test_failed_save_keeps_accounts(
         repository: AccountRepo, monkeypatch: pytest.MonkeyPatch) -> None:
-    repository.create("JimBOB", "JimBOB@email.com", "test-pw")
+    account = repository.create("JimBOB", "JimBOB@email.com", "test-pw")
     before = repository.file_path.read_bytes()
 
     def fail_save(source: Path, destination: Path) -> None:
@@ -68,6 +92,9 @@ def test_failed_save_keeps_accounts(
 
     with pytest.raises(OSError):
         repository.create("vegeta", "vegeta@email.com", "test-pw")
+
+    with pytest.raises(OSError):
+        repository.update(account["id"], {"name": "Ram Altman"})
 
     assert repository.file_path.read_bytes() == before
     assert list(repository.file_path.parent.iterdir()) == [repository.file_path]

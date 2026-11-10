@@ -31,3 +31,11 @@ def get_current_account(
         raise HTTPException(status_code=403, detail="Account is inactive") from error
     except (OSError, ValueError) as error:
         raise HTTPException(status_code=500, detail="Authentication is unavailable") from error
+
+
+def get_current_customer(
+        account: Annotated[dict[str, Any], Depends(get_current_account)]) -> dict[str, Any]:
+    if account["role"] != "customer":
+        raise HTTPException(status_code=403, detail="Customer account required")
+
+    return account

@@ -3,7 +3,7 @@ from pathlib import Path
 import pytest
 
 from app.repositories.account_repo import AccountRepo
-from app.services.account_service import AccountService
+from app.services.account_service import AccountService, InactiveAccountError
 
 
 @pytest.fixture
@@ -32,3 +32,18 @@ def test_sign_in_after_reload(service: AccountService) -> None:
 
     assert result["id"] == account["id"]
     assert result["email"] == "jimbob@email.com"
+
+
+def test_update_and_deactivate_account(service: AccountService) -> None:
+    account = service.register_customer("JimBOB", "JimBOB@email.com", "test-pw-jimbob")
+    account_id = account["id"]
+
+    assert service.update_name(account_id, "  Ram Altman  ")["name"] == "Ram Altman"
+    assert service.update_address(
+        account_id, "  123 Test Street  ")["delivery_address"] == "123 Test Street"
+    assert service.deactivate(account_id)["active"] is False
+
+    with pytest.raises(InactiveAccountError):
+        service.update_name(account_id, "vegeta")
+
+    assert service.repository.get_by_id(account_id) is not None
