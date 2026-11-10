@@ -47,6 +47,7 @@ def get_current_customer(
 
 def get_current_admin(
         account: Annotated[dict[str, Any], Depends(get_current_account)]) -> dict[str, Any]:
+    # inactive accounts are already blocked by get_current_account
     try:
         require_role(account, {"admin"})
     except PermissionDeniedError as error:

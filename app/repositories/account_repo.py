@@ -38,6 +38,7 @@ class AccountRepo:
     def create_staff(
             self, name: str, email: str, password_hash: str,
             role: str, restaurant_ids: list[int]) -> dict[str, Any]:
+        # the service must check that the restaurants exist
         if role not in {"admin", "restaurant_user"}:
             raise ValueError("Staff role must be admin or restaurant_user")
 
