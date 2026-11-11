@@ -509,3 +509,49 @@ def test_add_cart_item_storage_error(client):
     assert response.json() == {
         "detail": "Cart storage is unavailable"
     }
+
+
+def test_customer_cannot_add_item_to_another_cart(client):
+    """Test that customers can't modify another customer's cart."""
+    first_cart = client.post("/customers/me/cart")
+    assert first_cart.status_code == 201
+
+    registration = client.post(
+        "/customers",
+        json={
+            "name": "Second Customer",
+            "email": "second@example.com",
+            "password": "Password123!",
+        },
+    )
+    assert registration.status_code == 201
+
+    login = client.post(
+        "/auth/login",
+        json={
+            "email": "second@example.com",
+            "password": "Password123!",
+        },
+    )
+    assert login.status_code == 200
+
+    client.headers["Authorization"] = (
+        f"Bearer {login.json()['access_token']}"
+    )
+
+    response = client.post(
+        "/customers/me/cart/items",
+        json={
+            "menu_item_id": 1,
+            "quantity": 2,
+        },
+    )
+
+    assert response.status_code == 404
+    assert response.json()["detail"] == "Active cart not found"
+
+    saved_cart = carts.repository.get_by_id(first_cart.json()["id"])
+
+    assert saved_cart["customer_id"] == first_cart.json()["customer_id"]
+    assert saved_cart["restaurant_id"] is None
+    assert saved_cart["items"] == []
