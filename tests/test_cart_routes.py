@@ -633,6 +633,18 @@ def test_customer_cannot_view_another_cart(client):
     assert response.status_code == 404
     assert response.json()["detail"] == "Active cart not found"
 
+    second_cart = client.post("/customers/me/cart")
+    assert second_cart.status_code == 201
+
+    response = client.get("/customers/me/cart")
+
+    assert response.status_code == 200
+    assert response.json()["id"] == second_cart.json()["id"]
+    assert response.json()["customer_id"] == second_cart.json()["customer_id"]
+    assert response.json()["id"] != cart.json()["id"]
+    assert response.json()["items"] == []
+    assert response.json()["total"] == 0
+
     saved_carts = carts.repository.get_by_id(cart.json()["id"])
 
     assert saved_carts["customer_id"] == cart.json()["customer_id"]
@@ -708,3 +720,67 @@ def test_get_cart_with_missing_item(client):
     assert data["subtotal"] == 0
     assert data["total"] == 0
     assert data["problems"] == ["missing"]
+
+
+def test_get_cart_invalid_menu_data(client, monkeypatch):
+    """Test that malformed menu data returns a 500 error."""
+    created = client.post("/customers/me/cart")
+    assert created.status_code == 201
+
+    added = client.post(
+        "/customers/me/cart/items",
+        json={"menu_item_id": 1, "quantity": 2},
+    )
+    assert added.status_code == 200
+
+    monkeypatch.setattr(
+        carts.menu_repository,
+        "get_all",
+        lambda: [
+            {
+                "id": 1,
+                "name": "Burger",
+                "price": 100,
+            }
+        ],
+    )
+
+    response = client.get("/customers/me/cart")
+
+    assert response.status_code == 500
+    assert response.json() == {
+        "detail": "Cart storage is unavailable"
+    }
+
+
+def test_get_cart_invalid_menu_price(client, monkeypatch):
+    """Test that an invalid menu price returns a 500 error."""
+    created = client.post("/customers/me/cart")
+    assert created.status_code == 201
+
+    added = client.post(
+        "/customers/me/cart/items",
+        json={"menu_item_id": 1, "quantity": 2},
+    )
+    assert added.status_code == 200
+
+    monkeypatch.setattr(
+        carts.menu_repository,
+        "get_all",
+        lambda: [
+            {
+                "id": 1,
+                "restaurant_id": 1,
+                "name": "Burger",
+                "price": "100",
+                "available": True,
+            }
+        ],
+    )
+
+    response = client.get("/customers/me/cart")
+
+    assert response.status_code == 500
+    assert response.json() == {
+        "detail": "Cart storage is unavailable"
+    }

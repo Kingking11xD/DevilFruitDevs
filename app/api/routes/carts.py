@@ -65,7 +65,7 @@ def create_cart(
     description=(
         "Get the authenticated customer's active cart with current "
         "menu item prices, quantities, line totals, subtotal, total, "
-        "and item probelms."
+        "and item problems."
     ),
     responses={
         401: {"description": "Authentication required"},
@@ -81,14 +81,14 @@ def get_cart(
     try:
         cart = service.get_cart_details(account["id"])
         return CartDetail.model_validate(cart)
-    
+
     except CartNotFoundError as error:
         raise HTTPException(
             status_code=404,
             detail="Active cart not found",
         ) from error
 
-    except (OSError, ValueError) as error:
+    except (OSError, ValueError, KeyError, TypeError) as error:
         raise HTTPException(
             status_code=500,
             detail="Cart storage is unavailable",
