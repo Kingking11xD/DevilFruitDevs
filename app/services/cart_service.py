@@ -84,3 +84,63 @@ class CartService:
             raise CartNotFoundError("Active cart not found")
 
         return updated_cart
+    
+
+    def get_cart_details(self, customer_id: int) -> dict[str, Any]:
+        """Get a customer's active cart with item details and totals."""
+        cart = self.cart_repository.get_active_for_customer(customer_id)
+        if cart is None:
+            raise CartNotFoundError()
+        
+        menu_items = {
+            item["id"]: item
+            for item in self.menu_repository.get_all()
+        }
+
+        detailed_items = []
+        subtotal = 0
+        cart_problems = []
+
+        for cart_item in cart["items"]:
+            menu_item_id = cart_item["menu_item_id"]
+            quantity = cart_item["quantity"]
+            menu_item = menu_items.get(menu_item_id)
+            problems = []
+
+            if menu_item is None:
+                name = None
+                unit_price = None
+                line_total = None
+                problems.append("missing")
+            else:
+                name = menu_item["name"]
+                unit_price = menu_item["price"]
+                line_total = unit_price * quantity
+                subtotal += line_total
+
+                if not menu_item.get("active", True):
+                    problems.append("inactive")
+
+                if not menu_item["available"]:
+                    problems.append("unavailable")
+
+            detailed_items.append({
+                "menu_item_id": menu_item_id,
+                "name": name,
+                "quantity": quantity,
+                "unit_price": unit_price,
+                "line_total": line_total,
+                "problems": problems,
+            })
+
+            for problem in problems:
+                if problem not in cart_problems:
+                    cart_problems.append(problem)
+
+        return {
+            **cart,
+            "items": detailed_items,
+            "subtotal": subtotal,
+            "total": subtotal,
+            "problems": cart_problems,
+        }
