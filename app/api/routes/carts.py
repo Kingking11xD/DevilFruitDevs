@@ -34,6 +34,7 @@ def create_cart(
     """Create a cart or return the customer's existing active cart."""
     try:
         cart, created = repository.create(account["id"])
+        validated_cart = Cart.model_validate(cart)
     except (OSError, ValueError) as error:
         raise HTTPException(
             status_code=500,
@@ -43,7 +44,7 @@ def create_cart(
     response.status_code = (
         status.HTTP_201_CREATED if created else status.HTTP_200_OK
     )
-    return Cart.model_validate(cart)
+    return validated_cart
 
 @router.get(
     "/customers/me/cart",
@@ -66,16 +67,19 @@ def get_cart(
     """Return the customer's active cart without creating one."""
     try:
         cart = repository.get_active_for_customer(account["id"])
+
+        if cart is None:
+            raise HTTPException(
+                status_code=404,
+                detail="Active cart not found",
+            )
+        
+        validated_cart = Cart.model_validate(cart)
+    
     except (OSError, ValueError) as error:
         raise HTTPException(
             status_code=500,
             detail="Cart storage is unavailable",
         ) from error
     
-    if cart is None:
-        raise HTTPException(
-            status_code=404,
-            detail="Active cart not found",
-        )
-    
-    return Cart.model_validate(cart)
+    return validated_cart

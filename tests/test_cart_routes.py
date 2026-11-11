@@ -1,6 +1,7 @@
 """Tests for shopping cart API routes"""
 
 import pytest
+import json
 from fastapi.testclient import TestClient
 
 from main import app
@@ -152,3 +153,35 @@ def test_cart_persists_after_restart(client):
     assert saved_cart is not None
     assert saved_cart["id"] == created.json()["id"]
     assert saved_cart["status"] == "active"
+
+def test_cart_invalid_saved_data(client):
+    """Return 500 when a saved cart contains invalid item data."""
+    created = client.post("/customers/me/cart")
+    assert created.status_code == 201
+
+    cart = created.json()
+    cart["items"] = [
+        {"menu_item_id": 1, "quantity": 0}
+    ]
+
+    shopping_data = {
+        "carts": [cart],
+        "orders": [],
+    }
+
+    carts.repository.file_path.write_text(
+        json.dumps(shopping_data)
+    )
+
+    post_response = client.post("/customers/me/cart")
+    get_response = client.get("/customers/me/cart")
+
+    assert post_response.status_code == 500
+    assert post_response.json() == {
+        "detail": "Cart storage is unavailable"
+    }
+
+    assert get_response.status_code == 500
+    assert get_response.json() == {
+        "detail": "Cart storage is unavailable"
+    }
