@@ -116,14 +116,50 @@ def test_create_cart_requires_authentication(client):
 
 
 def test_get_existing_cart(client):
-    """Return the customer's existing active cart."""
+    """Test retrieving an empty active cart with calculated totals."""
     created = client.post("/customers/me/cart")
+    assert created.status_code == 201
 
     response = client.get("/customers/me/cart")
 
-    assert created.status_code == 201
     assert response.status_code == 200
-    assert response.json() == created.json()
+    assert response.json() == {
+        **created.json(),
+        "subtotal": 0,
+        "total": 0,
+        "problems": [],
+    }
+
+
+def test_get_cart_with_items_and_totals(client):
+    """Test that GET cart returns item details and calculated totals."""
+    created = client.post("/customers/me/cart")
+    assert created.status_code == 201
+
+    added = client.post(
+        "/customers/me/cart/items",
+        json={"menu_item_id": 1, "quantity": 2},
+    )
+    assert added.status_code == 200
+
+    response = client.get("/customers/me/cart")
+
+    assert response.status_code == 200
+
+    data = response.json()
+
+    assert len(data["items"]) == 1
+    assert data["items"][0] == {
+        "menu_item_id": 1,
+        "name": "Burger",
+        "quantity": 2,
+        "unit_price": 100,
+        "line_total": 200,
+        "problems": [],
+    }
+    assert data["subtotal"] == 200
+    assert data["total"] == 200
+    assert data["problems"] == []
 
 
 def test_get_cart_not_found(client):
@@ -470,9 +506,16 @@ def test_rejected_cart_item_does_not_change_cart(client):
     assert response.json()["items"] == [
         {
             "menu_item_id": 1,
+            "name": "Burger",
             "quantity": 2,
+            "unit_price": 100,
+            "line_total": 200,
+            "problems": [],
         }
     ]
+    assert response.json()["subtotal"] == 200
+    assert response.json()["total"] == 200
+    assert response.json()["problems"] == []
 
 
 def test_add_cart_item_requires_authentication(client):
@@ -555,3 +598,113 @@ def test_customer_cannot_add_item_to_another_cart(client):
     assert saved_cart["customer_id"] == first_cart.json()["customer_id"]
     assert saved_cart["restaurant_id"] is None
     assert saved_cart["items"] == []
+
+
+def test_customer_cannot_view_another_cart(client):
+    """Test that customers can't view another customer's cart."""
+    cart = client.post("/customers/me/cart")
+    assert cart.status_code == 201
+
+    registration = client.post(
+        "/customers",
+        json={
+            "name": "Customer",
+            "email": "cust@example.com",
+            "password": "Password123!",
+        },
+    )
+    assert registration.status_code == 201
+
+    login = client.post(
+        "/auth/login",
+        json={
+            "email": "cust@example.com",
+            "password": "Password123!",
+        },
+    )
+    assert login.status_code == 200
+
+    client.headers["Authorization"] = (
+        f"Bearer {login.json()['access_token']}"
+    )
+
+    response = client.get("/customers/me/cart")
+
+    assert response.status_code == 404
+    assert response.json()["detail"] == "Active cart not found"
+
+    saved_carts = carts.repository.get_by_id(cart.json()["id"])
+
+    assert saved_carts["customer_id"] == cart.json()["customer_id"]
+    assert saved_carts["items"] == []
+
+
+def test_get_cart_with_unavailable_item(client):
+    """Test that GET cart reports unavailable saved items."""
+    created = client.post("/customers/me/cart")
+    assert created.status_code == 201
+
+    carts.repository.modify(
+        created.json()["id"],
+        lambda cart: cart.update({
+            "restaurant_id": 1,
+            "items": [
+                {"menu_item_id": 3, "quantity": 2},
+            ],
+        }),
+    )
+
+    response = client.get("/customers/me/cart")
+
+    assert response.status_code == 200
+
+    data = response.json()
+
+    assert data["items"] == [
+        {
+            "menu_item_id": 3,
+            "name": "Fries",
+            "quantity": 2,
+            "unit_price": 50,
+            "line_total": 100,
+            "problems": ["unavailable"],
+        }
+    ]
+    assert data["subtotal"] == 100
+    assert data["total"] == 100
+    assert data["problems"] == ["unavailable"]
+
+def test_get_cart_with_missing_item(client):
+    """Test that GET cart reports missing menu items."""
+    created = client.post("/customers/me/cart")
+    assert created.status_code == 201
+
+    carts.repository.modify(
+        created.json()["id"],
+        lambda cart: cart.update({
+            "restaurant_id": 1,
+            "items": [
+                {"menu_item_id": 50, "quantity": 2},
+            ],
+        }),
+    )
+
+    response = client.get("/customers/me/cart")
+
+    assert response.status_code == 200
+
+    data = response.json()
+
+    assert data["items"] == [
+        {
+            "menu_item_id": 50,
+            "name": None,
+            "quantity": 2,
+            "unit_price": None,
+            "line_total": None,
+            "problems": ["missing"],
+        }
+    ]
+    assert data["subtotal"] == 0
+    assert data["total"] == 0
+    assert data["problems"] == ["missing"]
