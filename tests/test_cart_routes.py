@@ -19,6 +19,36 @@ def client(tmp_path, monkeypatch):
     shopping_path = tmp_path / "shopping.json"
     shopping_path.write_text('{"carts": [], "orders": []}')
 
+    menu_file = tmp_path / "menu_items.json"
+    menu_file.write_text(
+        json.dumps([
+            {
+                "id": 1,
+                "restaurant_id": 1,
+                "name": "Burger",
+                "price": 100,
+                "available": True,
+                "active": True,
+            },
+            {
+                "id": 2,
+                "restaurant_id": 2,
+                "name": "Pizza",
+                "price": 150,
+                "available": True,
+                "active": True,
+            },
+            {
+                "id": 3,
+                "restaurant_id": 1,
+                "name": "Fries",
+                "price": 50,
+                "available": False,
+                "active": True,
+            },
+        ])
+    )
+
     monkeypatch.setattr(
         dependencies.repository, "file_path", accounts_path
     )
@@ -26,6 +56,7 @@ def client(tmp_path, monkeypatch):
         carts.repository, "file_path", shopping_path
     )
     monkeypatch.setattr(token_service, "sessions", {})
+    monkeypatch.setattr(carts.menu_repository, "file_path", menu_file)
 
     client = TestClient(app)
 
@@ -52,6 +83,7 @@ def client(tmp_path, monkeypatch):
 
     return client
 
+
 def test_create_cart(client):
     """A customer can create an empty cart."""
     response = client.post("/customers/me/cart")
@@ -60,6 +92,7 @@ def test_create_cart(client):
     assert response.json()["status"] == "active"
     assert response.json()["items"] == []
     assert response.json()["restaurant_id"] is None
+
 
 def test_create_cart_returns_existing(client):
     """Creating a cart twice returns the same active cart."""
@@ -71,6 +104,7 @@ def test_create_cart_returns_existing(client):
     assert second.json()["id"] == first.json()["id"]
     assert len(carts.repository.get_all()) == 1
 
+
 def test_create_cart_requires_authentication(client):
     """A customer must sign in before creating a cart."""
     client.headers.pop("Authorization")
@@ -79,6 +113,7 @@ def test_create_cart_requires_authentication(client):
 
     assert response.status_code == 401
     assert response.json()["detail"] == "Authentication required"
+
 
 def test_get_existing_cart(client):
     """Return the customer's existing active cart."""
@@ -90,6 +125,7 @@ def test_get_existing_cart(client):
     assert response.status_code == 200
     assert response.json() == created.json()
 
+
 def test_get_cart_not_found(client):
     """Return 404 when the customer has no active cart."""
     response = client.get("/customers/me/cart")
@@ -97,6 +133,7 @@ def test_get_cart_not_found(client):
     assert response.status_code == 404
     assert response.json()["detail"] == "Active cart not found"
     assert carts.repository.get_all() == []
+
 
 def test_get_cart_requires_authentication(client):
     """Reject requests from customers who are not signed in."""
@@ -106,6 +143,7 @@ def test_get_cart_requires_authentication(client):
 
     assert response.status_code == 401
     assert response.json()["detail"] == "Authentication required"
+
 
 def test_cart_storage_error(client):
     """Return 500 when the cart storage contains invalid JSON."""
@@ -124,6 +162,7 @@ def test_cart_storage_error(client):
         "detail": "Cart storage is unavailable"
     }
 
+
 def test_deactivated_customer_cannot_access_cart(client):
     """Reject cart request from a deactivated customer."""
     created = client.post("/customers/me/cart")
@@ -141,6 +180,7 @@ def test_deactivated_customer_cannot_access_cart(client):
     assert get_response.status_code == 403
     assert get_response.json()["detail"] == "Account is inactive"
 
+
 def test_cart_persists_after_restart(client):
     """Verify that a cart remains saved in storage."""
     created = client.post("/customers/me/cart")
@@ -153,6 +193,7 @@ def test_cart_persists_after_restart(client):
     assert saved_cart is not None
     assert saved_cart["id"] == created.json()["id"]
     assert saved_cart["status"] == "active"
+
 
 def test_cart_invalid_saved_data(client):
     """Return 500 when a saved cart contains invalid item data."""
@@ -183,5 +224,288 @@ def test_cart_invalid_saved_data(client):
 
     assert get_response.status_code == 500
     assert get_response.json() == {
+        "detail": "Cart storage is unavailable"
+    }
+
+
+def test_add_cart_item(client):
+    """Test adding an available menu item to the active cart."""
+    client.post("/customers/me/cart")
+
+    response = client.post(
+        "/customers/me/cart/items",
+        json={
+            "menu_item_id": 1,
+            "quantity": 2,
+        },
+    )
+
+    assert response.status_code == 200
+
+    cart = response.json()
+    assert cart["restaurant_id"] == 1
+    assert cart["items"] == [
+        {
+            "menu_item_id": 1,
+            "quantity": 2,
+        }
+    ]
+
+
+def test_add_existing_cart_item(client):
+    """Test increasing the quantity of an existing cart item."""
+    client.post("/customers/me/cart")
+
+    client.post(
+        "/customers/me/cart/items",
+        json={
+            "menu_item_id": 1,
+            "quantity": 2,
+        },
+    )
+
+    response = client.post(
+        "/customers/me/cart/items",
+        json={
+            "menu_item_id": 1,
+            "quantity": 3,
+        },
+    )
+
+    assert response.status_code == 200
+    assert response.json()["items"] == [
+        {
+            "menu_item_id": 1,
+            "quantity": 5,
+        }
+    ]
+
+
+def test_add_unavailable_cart_item(client):
+    """Test rejecting an unavailable menu item."""
+    client.post("/customers/me/cart")
+
+    response = client.post(
+        "/customers/me/cart/items",
+        json={
+            "menu_item_id": 3,
+            "quantity": 2,
+        },
+    )
+
+    assert response.status_code == 409
+    assert response.json() == {
+        "detail": "Menu item is unavailable"
+    }
+
+
+def test_add_item_from_different_restaurant(client):
+    """Test rejecting an item from a different restaurant."""
+    client.post("/customers/me/cart")
+
+    first_response = client.post(
+        "/customers/me/cart/items",
+        json={
+            "menu_item_id": 1,
+            "quantity": 2,
+        },
+    )
+    assert first_response.status_code == 200
+
+    response = client.post(
+        "/customers/me/cart/items",
+        json={
+            "menu_item_id": 2,
+            "quantity": 1,
+        },
+    )
+
+    assert response.status_code == 409
+    assert response.json() == {
+        "detail": "Can't add items from different restaurants"
+    }
+
+
+def test_add_nonexistent_cart_item(client):
+    """Test rejecting a menu item that does not exist."""
+    client.post("/customers/me/cart")
+
+    response = client.post(
+        "/customers/me/cart/items",
+        json={
+            "menu_item_id": 67,
+            "quantity": 1,
+        },
+    )
+
+    assert response.status_code == 404
+    assert response.json() == {
+        "detail": "Menu item not found"
+    }
+
+
+def test_add_deactivated_cart_item(client, monkeypatch, tmp_path):
+    """Test rejecting a deactivated menu item."""
+    menu_file = tmp_path / "deactivated_menu.json"
+
+    menu_file.write_text(
+        json.dumps([
+            {
+                "id": 4,
+                "restaurant_id": 1,
+                "name": "Salad",
+                "price": 80,
+                "available": True,
+                "active": False,
+            },
+        ])
+    )
+
+    monkeypatch.setattr(carts.menu_repository, "file_path", menu_file)
+
+    client.post("/customers/me/cart")
+
+    response = client.post(
+        "/customers/me/cart/items",
+        json={
+            "menu_item_id": 4,
+            "quantity": 1,
+        },
+    )
+
+    assert response.status_code == 409
+    assert response.json() == {
+        "detail": "Menu item is unavailable"
+    }
+
+@pytest.mark.parametrize(
+    "quantity",
+    [0, -1, "2", True, 1.5, None],
+)
+def test_add_cart_item_invalid_quantity(client, quantity):
+    """Test rejecting invalid cart item quantities."""
+    client.post("/customers/me/cart")
+
+    response = client.post(
+        "/customers/me/cart/items",
+        json={
+            "menu_item_id": 1,
+            "quantity": quantity,
+        },
+    )
+
+    assert response.status_code == 422
+
+
+def test_add_item_without_active_cart(client):
+    """Test rejecting an item when the customer has no active cart."""
+    response = client.post(
+        "/customers/me/cart/items",
+        json={
+            "menu_item_id": 1,
+            "quantity": 2,
+        },
+    )
+
+    assert response.status_code == 404
+    assert response.json() == {
+        "detail": "Active cart not found"
+    }
+
+
+def test_added_cart_item_persists(client):
+    """Test that an added cart item is saved to storage."""
+    create_response = client.post("/customers/me/cart")
+    assert create_response.status_code == 201
+
+    response = client.post(
+        "/customers/me/cart/items",
+        json={
+            "menu_item_id": 1,
+            "quantity": 2,
+        },
+    )
+
+    assert response.status_code == 200
+
+    saved_cart = carts.repository.get_active_for_customer(
+        create_response.json()["customer_id"]
+    )
+
+    assert saved_cart["restaurant_id"] == 1
+    assert saved_cart["items"] == [
+        {
+            "menu_item_id": 1,
+            "quantity": 2,
+        }
+    ]
+
+
+def test_rejected_cart_item_does_not_change_cart(client):
+    """Test that a rejected item leaves the cart unchanged."""
+    client.post("/customers/me/cart")
+
+    first_response = client.post(
+        "/customers/me/cart/items",
+        json={
+            "menu_item_id": 1,
+            "quantity": 2,
+        },
+    )
+    assert first_response.status_code == 200
+
+    rejected_response = client.post(
+        "/customers/me/cart/items",
+        json={
+            "menu_item_id": 2,
+            "quantity": 1,
+        },
+    )
+    assert rejected_response.status_code == 409
+
+    response = client.get("/customers/me/cart")
+
+    assert response.status_code == 200
+    assert response.json()["restaurant_id"] == 1
+    assert response.json()["items"] == [
+        {
+            "menu_item_id": 1,
+            "quantity": 2,
+        }
+    ]
+
+
+def test_add_cart_item_requires_authentication(client):
+    """Test that an unauthenticated user can't add cart items."""
+    client.headers.pop("Authorization")
+
+    response = client.post(
+        "/customers/me/cart/items",
+        json={
+            "menu_item_id": 1,
+            "quantity": 2,
+        },
+    )
+
+    assert response.status_code == 401
+    assert response.json()["detail"] == "Authentication required"
+
+
+def test_add_cart_item_storage_error(client):
+    """Test handling a cart storage error when adding an item."""
+    client.post("/customers/me/cart")
+
+    carts.repository.file_path.write_text("invalid json")
+
+    response = client.post(
+        "/customers/me/cart/items",
+        json={
+            "menu_item_id": 1,
+            "quantity": 2,
+        },
+    )
+
+    assert response.status_code == 500
+    assert response.json() == {
         "detail": "Cart storage is unavailable"
     }
