@@ -821,3 +821,257 @@ def test_add_item_invalid_saved_cart_unchanged(client):
 
     saved_cart = carts.repository.get_by_id(cart["id"])
     assert saved_cart == cart
+
+
+def test_update_cart_item_quantity(client):
+    """Test updating an item's quantity and recalculating totals."""
+    client.post("/customers/me/cart")
+
+    added = client.post(
+        "/customers/me/cart/items",
+        json={"menu_item_id": 1, "quantity": 2},
+    )
+    assert added.status_code == 200
+
+    response = client.patch(
+        "/customers/me/cart/items/1",
+        json={"quantity": 5},
+    )
+
+    assert response.status_code == 200
+
+    data = response.json()
+    assert data["items"][0]["menu_item_id"] == 1
+    assert data["items"][0]["quantity"] == 5
+    assert data["items"][0]["line_total"] == 500
+    assert data["subtotal"] == 500
+    assert data["total"] == 500
+
+    saved_cart = carts.repository.get_active_for_customer(
+        data["customer_id"]
+    )
+    assert saved_cart["items"][0]["quantity"] == 5
+
+
+@pytest.mark.parametrize("quantity", [0, -1, 2.5, True, "5", None])
+def test_update_cart_item_invalid_quantity(client, quantity):
+    """Test that invalid quantities return 422 without changing the cart."""
+    client.post("/customers/me/cart")
+
+    added = client.post(
+        "/customers/me/cart/items",
+        json={"menu_item_id": 1, "quantity": 2},
+    )
+    assert added.status_code == 200
+
+    customer_id = added.json()["customer_id"]
+    original_cart = carts.repository.get_active_for_customer(customer_id)
+
+    response = client.patch(
+        "/customers/me/cart/items/1",
+        json={"quantity": quantity},
+    )
+
+    assert response.status_code == 422
+
+    saved_cart = carts.repository.get_active_for_customer(customer_id)
+    assert saved_cart == original_cart
+
+
+def test_update_cart_item_missing_item(client):
+    """Test that updating a missing cart item returns 404."""
+    client.post("/customers/me/cart")
+
+    added = client.post(
+        "/customers/me/cart/items",
+        json={"menu_item_id": 1, "quantity": 2},
+    )
+    assert added.status_code == 200
+
+    customer_id = added.json()["customer_id"]
+    original_cart = carts.repository.get_active_for_customer(customer_id)
+
+    response = client.patch(
+        "/customers/me/cart/items/999",
+        json={"quantity": 5},
+    )
+
+    assert response.status_code == 404
+
+    saved_cart = carts.repository.get_active_for_customer(customer_id)
+    assert saved_cart == original_cart
+
+
+def test_update_cart_item_without_active_cart(client):
+    """Test that updating an item without an active cart returns 404."""
+    response = client.patch(
+        "/customers/me/cart/items/1",
+        json={"quantity": 5},
+    )
+
+    assert response.status_code == 404
+    assert response.json() == {
+        "detail": "Active cart not found"
+    }
+    assert carts.repository.get_all() == []
+
+
+def test_update_cart_item_requires_authentication(client):
+    """Test that unauthenticated users can't update cart quantities."""
+    created = client.post("/customers/me/cart")
+    assert created.status_code == 201
+
+    added = client.post(
+        "/customers/me/cart/items",
+        json={"menu_item_id": 1, "quantity": 2},
+    )
+    assert added.status_code == 200
+
+    customer_id = created.json()["customer_id"]
+    original_cart = carts.repository.get_active_for_customer(customer_id)
+
+    client.headers.pop("Authorization")
+
+    response = client.patch(
+        "/customers/me/cart/items/1",
+        json={"quantity": 5},
+    )
+
+    assert response.status_code == 401
+    assert response.json()["detail"] == "Authentication required"
+
+    saved_cart = carts.repository.get_active_for_customer(customer_id)
+    assert saved_cart == original_cart
+
+
+def test_deactivated_customer_cannot_update_cart_item(client):
+    """Test that inactive customers can't update cart quantities."""
+    created = client.post("/customers/me/cart")
+    assert created.status_code == 201
+
+    added = client.post(
+        "/customers/me/cart/items",
+        json={"menu_item_id": 1, "quantity": 2},
+    )
+    assert added.status_code == 200
+
+    customer_id = created.json()["customer_id"]
+    original_cart = carts.repository.get_active_for_customer(customer_id)
+
+    deactivated = client.post("/customers/me/deactivate")
+    assert deactivated.status_code == 200
+
+    response = client.patch(
+        "/customers/me/cart/items/1",
+        json={"quantity": 5},
+    )
+
+    assert response.status_code == 403
+    assert response.json()["detail"] == "Account is inactive"
+
+    saved_cart = carts.repository.get_active_for_customer(customer_id)
+    assert saved_cart == original_cart
+
+
+def test_customer_cannot_update_another_cart(client):
+    """Test that customers can't update another customer's cart."""
+    first_cart = client.post("/customers/me/cart")
+    assert first_cart.status_code == 201
+
+    added = client.post(
+        "/customers/me/cart/items",
+        json={"menu_item_id": 1, "quantity": 2},
+    )
+    assert added.status_code == 200
+
+    original_cart = carts.repository.get_by_id(first_cart.json()["id"])
+
+    registration = client.post(
+        "/customers",
+        json={
+            "name": "Customer",
+            "email": "cust@example.com",
+            "password": "Password123!",
+        },
+    )
+    assert registration.status_code == 201
+
+    login = client.post(
+        "/auth/login",
+        json={
+            "email": "cust@example.com",
+            "password": "Password123!",
+        },
+    )
+    assert login.status_code == 200
+
+    client.headers["Authorization"] = (
+        f"Bearer {login.json()['access_token']}"
+    )
+
+    response = client.patch(
+        "/customers/me/cart/items/1",
+        json={"quantity": 5},
+    )
+
+    assert response.status_code == 404
+    assert response.json()["detail"] == "Active cart not found"
+
+    saved_cart = carts.repository.get_by_id(first_cart.json()["id"])
+    assert saved_cart == original_cart
+
+
+def test_update_cart_item_invalid_saved_cart_unchanged(client):
+    """Test that invalid saved cart data is rejected without modification."""
+    client.post("/customers/me/cart")
+
+    added = client.post(
+        "/customers/me/cart/items",
+        json={"menu_item_id": 1, "quantity": 2},
+    )
+    assert added.status_code == 200
+
+    cart_file = carts.repository.file_path
+    shopping = json.loads(cart_file.read_text())
+    shopping["carts"][0]["items"][0]["quantity"] = 0
+    cart_file.write_text(json.dumps(shopping))
+
+    original_data = cart_file.read_text()
+
+    response = client.patch(
+        "/customers/me/cart/items/1",
+        json={"quantity": 5},
+    )
+
+    assert response.status_code == 500
+    assert response.json()["detail"] == "Cart storage is unavailable"
+    assert cart_file.read_text() == original_data
+
+
+def test_update_cart_item_storage_error(client, monkeypatch):
+    """Test that a storage failure returns 500 without changing the cart."""
+    client.post("/customers/me/cart")
+
+    added = client.post(
+        "/customers/me/cart/items",
+        json={"menu_item_id": 1, "quantity": 2},
+    )
+    assert added.status_code == 200
+
+    cart_file = carts.repository.file_path
+    original_data = cart_file.read_text()
+
+    def fail_modify(cart_id, change):
+        """Simulate a failure while saving the cart."""
+        raise OSError("Storage failure")
+
+    monkeypatch.setattr(carts.repository, "modify", fail_modify)
+
+    response = client.patch(
+        "/customers/me/cart/items/1",
+        json={"quantity": 5},
+    )
+
+    assert response.status_code == 500
+    assert response.json()["detail"] == "Cart storage is unavailable"
+    assert cart_file.read_text() == original_data

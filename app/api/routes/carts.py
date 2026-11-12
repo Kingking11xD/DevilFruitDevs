@@ -7,9 +7,10 @@ from fastapi import APIRouter, Depends, HTTPException, Response, status
 from app.api.dependencies import get_current_customer
 from app.repositories.cart_repo import CartRepo
 from app. repositories.menu_repo import MenuRepo
-from app.schemas.cart import Cart, CartItemAdd, CartDetail
+from app.schemas.cart import Cart, CartItemAdd, CartItemUpdate, CartDetail
 from app.services.cart_service import (
     CartNotFoundError,
+    CartItemNotFoundError,
     CartRestaurantMismatchError,
     CartService,
     MenuItemNotAvailableError,
@@ -149,3 +150,48 @@ def add_cart_item(
         ) from error
 
     return validated_cart
+
+
+@router.patch(
+    "/customers/me/cart/items/{item_id}",
+    response_model=CartDetail,
+    status_code=200,
+    summary="Update item quantity in my cart",
+    description=(
+        "Replace the quantity of an existing item in the signed in "
+        "customer's active cart and return the updated cart with totals."
+    ),
+    responses={
+        401: {"description": "Authentication required"},
+        403: {"description": "Customer account is inactive or unauthorized"},
+        404: {"description": "Cart or cart item not found"},
+        422: {"description": "Invalid item ID or quantity"},
+        500: {"description": "Cart storage is unavailable"},
+    },
+)
+def update_cart_item_quantity(
+    item_id: int,
+    item: CartItemUpdate,
+    account: Annotated[dict[str, Any], Depends(get_current_customer)],
+) -> CartDetail:
+    """Update an existing cart item's quantity and return updated totals."""
+    try:
+        service.update_item_quantity(
+            customer_id=account["id"],
+            menu_item_id=item_id,
+            quantity=item.quantity,
+        )
+        cart = service.get_cart_details(account["id"])
+        return CartDetail.model_validate(cart)
+
+    except (CartNotFoundError, CartItemNotFoundError) as error:
+        raise HTTPException(
+            status_code=404,
+            detail=str(error),
+        ) from error
+
+    except (OSError, ValueError, KeyError, TypeError) as error:
+        raise HTTPException(
+            status_code=500,
+            detail="Cart storage is unavailable",
+        ) from error
