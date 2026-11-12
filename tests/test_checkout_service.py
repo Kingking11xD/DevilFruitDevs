@@ -141,6 +141,7 @@ def test_checkout_rejects_invalid_customer(files: dict[str, Path], change, error
     [
         ("menu_items", lambda items: items[1].update(available=False)),  # Item became unavailable
         ("menu_items", lambda items: items[1].update(active=False)),  # Item was deactivated
+        ("restaurants", lambda restaurants: restaurants[0].update(active=False)),  # Restaurant was deactivated
     ],
 )
 def test_checkout_rejects_unavailable_items(files: dict[str, Path], file_name: str, change) -> None:

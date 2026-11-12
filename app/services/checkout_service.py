@@ -85,8 +85,8 @@ class CheckoutService:
                 raise EmptyCartError(cart["id"])
 
             restaurant = _find(references["restaurants"], cart["restaurant_id"])
-            if restaurant is None:
-                raise UnavailableItemError("Restaurant no longer exists")
+            if restaurant is None or not restaurant.get("active", True):
+                raise UnavailableItemError("Restaurant is not accepting orders for this item")
 
             menu_items = {item["id"]: item for item in references["menu_items"]}
             for cart_item in cart["items"]:
