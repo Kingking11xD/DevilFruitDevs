@@ -170,7 +170,10 @@ def add_cart_item(
     },
 )
 def update_cart_item_quantity(
-    item_id: Annotated[int, Path(gt=0)],
+    item_id: Annotated[
+        int,
+        Path(gt=0, description="Menu item ID of the item in the cart"),
+    ],
     item: CartItemUpdate,
     account: Annotated[dict[str, Any], Depends(get_current_customer)],
 ) -> CartDetail:

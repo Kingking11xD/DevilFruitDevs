@@ -252,6 +252,40 @@ def test_update_item_quantity_invalid_saved_cart_unchanged(cart_service):
     assert cart_file.read_text() == original_data
 
 
+def test_update_item_quantity_cart_closed_before_modify(
+    cart_service, monkeypatch
+):
+    """Test that a cart closing during an update keeps its quantity."""
+    cart_service.add_item(
+        customer_id=1,
+        menu_item_id=1,
+        quantity=2,
+    )
+
+    repo = cart_service.cart_repository
+    original_modify = repo.modify
+
+    def closed_before_modify(cart_id, change):
+        """Simulate the cart closing before the quantity is updated."""
+        repo.update(cart_id, {"status": "closed"})
+        return original_modify(cart_id, change)
+
+    monkeypatch.setattr(repo, "modify", closed_before_modify)
+
+    with pytest.raises(CartNotFoundError):
+        cart_service.update_item_quantity(
+            customer_id=1,
+            menu_item_id=1,
+            quantity=5,
+        )
+
+    saved_cart = repo.get_by_id(1)
+    assert saved_cart["status"] == "closed"
+    assert saved_cart["items"] == [
+        {"menu_item_id": 1, "quantity": 2}
+    ]
+
+
 def test_add_unavailable_item(cart_service):
     """Test rejecting an unavailable menu item."""
     with pytest.raises(MenuItemNotAvailableError):
