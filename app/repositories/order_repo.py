@@ -1,8 +1,12 @@
+from datetime import datetime
 from pathlib import Path
 from typing import Any
 
 from app.repositories.json_store import data_path, read_shopping
 
+def _created_at(order: dict[str, Any]) -> datetime:
+    """set a timestamp for when order is saed"""
+    return datetime.fromisoformat(order["created_at"].replace("Z", "+00:00"))
 
 class OrderRepo:
     """Read orders stored in shopping json file.
@@ -34,8 +38,11 @@ class OrderRepo:
         orders = [
             order for order in self.get_all() if order["customer_id"] == customer_id
         ]
-        return sorted(orders, key=lambda order: order["id"], reverse=True)
-
+        # Sort by creation time
+        return sorted(
+            orders, key=lambda order: (_created_at(order), order["id"]), reverse=True
+        )
+    
     def get_by_source_cart(self, cart_id: int) -> dict[str, Any] | None:
         """return order created from the cart, or None if none exists."""
         for order in self.get_all():
