@@ -286,6 +286,218 @@ def test_update_item_quantity_cart_closed_before_modify(
     ]
 
 
+def test_remove_last_cart_item(cart_service):
+    """Test removing the last item resets the cart and totals."""
+    cart_service.add_item(
+        customer_id=1,
+        menu_item_id=1,
+        quantity=2,
+    )
+
+    updated_cart = cart_service.remove_item(
+        customer_id=1,
+        menu_item_id=1,
+    )
+
+    assert updated_cart["items"] == []
+    assert updated_cart["restaurant_id"] is None
+
+    saved_cart = cart_service.cart_repository.get_active_for_customer(1)
+    assert saved_cart["items"] == []
+    assert saved_cart["restaurant_id"] is None
+
+    details = cart_service.get_cart_details(customer_id=1)
+    assert details["subtotal"] == 0
+    assert details["total"] == 0
+
+
+def test_remove_cart_item_keeps_other_items(cart_service):
+    """Test removing one item leaves other items unchanged."""
+    cart_service.add_item(
+        customer_id=1,
+        menu_item_id=1,
+        quantity=2,
+    )
+
+    repo = cart_service.cart_repository
+    repo.modify(
+        1,
+        lambda cart: cart["items"].append({
+            "menu_item_id": 3,
+            "quantity": 3,
+        }),
+    )
+
+    updated_cart = cart_service.remove_item(
+        customer_id=1,
+        menu_item_id=1,
+    )
+
+    expected_items = [{"menu_item_id": 3, "quantity": 3}]
+
+    assert updated_cart["items"] == expected_items
+    assert updated_cart["restaurant_id"] == 1
+
+    saved_cart = repo.get_active_for_customer(1)
+    assert saved_cart["items"] == expected_items
+
+    details = cart_service.get_cart_details(customer_id=1)
+    assert details["subtotal"] == 150
+    assert details["total"] == 150
+
+
+def test_remove_cart_item_not_found(cart_service):
+    """Test removing a nonexistent item leaves the cart unchanged."""
+    cart_service.add_item(
+        customer_id=1,
+        menu_item_id=1,
+        quantity=2,
+    )
+
+    repo = cart_service.cart_repository
+    original_cart = repo.get_active_for_customer(1)
+
+    with pytest.raises(CartItemNotFoundError):
+        cart_service.remove_item(
+            customer_id=1,
+            menu_item_id=310,
+        )
+
+    saved_cart = repo.get_active_for_customer(1)
+    assert saved_cart == original_cart
+
+
+def test_remove_cart_item_no_active_cart(cart_service):
+    """Test removing an item when the customer has no active cart."""
+    repo = cart_service.cart_repository
+    original_cart = repo.get_active_for_customer(1)
+
+    with pytest.raises(CartNotFoundError):
+        cart_service.remove_item(
+            customer_id=22,
+            menu_item_id=1,
+        )
+
+    saved_cart = repo.get_active_for_customer(1)
+    assert saved_cart == original_cart
+
+
+def test_remove_cart_item_only_own_cart(cart_service):
+    """Test that removing an item only affects the customer's cart."""
+    repo = cart_service.cart_repository
+    repo.create(customer_id=2)
+
+    cart_service.add_item(
+        customer_id=1,
+        menu_item_id=1,
+        quantity=2,
+    )
+    cart_service.add_item(
+        customer_id=2,
+        menu_item_id=1,
+        quantity=3,
+    )
+
+    cart_service.remove_item(
+        customer_id=2,
+        menu_item_id=1,
+    )
+
+    cart_1 = repo.get_active_for_customer(1)
+    cart_2 = repo.get_active_for_customer(2)
+
+    assert cart_1["items"] == [
+        {"menu_item_id": 1, "quantity": 2}
+    ]
+    assert cart_2["items"] == []
+    assert cart_2["restaurant_id"] is None
+
+
+def test_remove_cart_item_invalid_saved_cart_unchanged(cart_service):
+    """Test that invalid saved cart data is not modified."""
+    cart_service.add_item(
+        customer_id=1,
+        menu_item_id=1,
+        quantity=2,
+    )
+
+    cart_file = cart_service.cart_repository.file_path
+    shopping = json.loads(cart_file.read_text())
+    shopping["carts"][0]["items"][0]["quantity"] = 0
+    cart_file.write_text(json.dumps(shopping))
+
+    original_data = cart_file.read_text()
+
+    with pytest.raises(ValidationError):
+        cart_service.remove_item(
+            customer_id=1,
+            menu_item_id=1,
+        )
+
+    assert cart_file.read_text() == original_data
+
+
+def test_remove_cart_item_duplicate_items_unchanged(cart_service):
+    """Test that duplicate saved cart items are rejected."""
+    cart_service.add_item(
+        customer_id=1,
+        menu_item_id=1,
+        quantity=2,
+    )
+
+    cart_file = cart_service.cart_repository.file_path
+    shopping = json.loads(cart_file.read_text())
+    shopping["carts"][0]["items"].append({
+        "menu_item_id": 1,
+        "quantity": 3,
+    })
+    cart_file.write_text(json.dumps(shopping))
+
+    original_data = cart_file.read_text()
+
+    with pytest.raises(ValueError, match="Duplicate cart items"):
+        cart_service.remove_item(
+            customer_id=1,
+            menu_item_id=1,
+        )
+
+    assert cart_file.read_text() == original_data
+
+
+def test_remove_cart_item_cart_closed_before_modify(
+        cart_service, monkeypatch
+):
+    """Test that removing an item from a newly closed cart is rejected."""
+    cart_service.add_item(
+        customer_id=1,
+        menu_item_id=1,
+        quantity=2,
+    )
+
+    repo = cart_service.cart_repository
+    original_modify = repo.modify
+
+    def close_before_modify(cart_id, change):
+        """Simulate the cart closing before removal."""
+        repo.update(cart_id, {"status": "closed"})
+        return original_modify(cart_id, change)
+    
+    monkeypatch.setattr(repo, "modify", close_before_modify)
+
+    with pytest.raises(CartNotFoundError):
+        cart_service.remove_item(
+            customer_id=1,
+            menu_item_id=1,
+        )
+
+        saved_cart = repo.get_by_id(1)
+        assert saved_cart["status"] == "closed"
+        assert saved_cart["items"] == [
+            {"menu_item_id": 1, "quantity": 2}
+        ]
+        assert saved_cart["restaurant_id"] == 1
+
+
 def test_add_unavailable_item(cart_service):
     """Test rejecting an unavailable menu item."""
     with pytest.raises(MenuItemNotAvailableError):
