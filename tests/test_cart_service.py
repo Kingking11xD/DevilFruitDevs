@@ -188,3 +188,118 @@ def test_rejected_item_does_not_change_cart(cart_service):
             "quantity": 2,
         }
     ]
+
+
+def test_get_cart_details_calculates_totals(cart_service):
+    """Test that cart details include correct prices and totals."""
+    cart_service.add_item(
+        customer_id=1, menu_item_id=1, quantity=2
+    )
+
+    result = cart_service.get_cart_details(customer_id=1)
+
+    assert len(result["items"]) == 1
+    assert result["items"][0] == {
+        "menu_item_id": 1,
+        "name": "Burger",
+        "quantity": 2,
+        "unit_price": 100,
+        "line_total": 200,
+        "problems": []
+    }
+    assert result["subtotal"] == 200
+    assert result["total"] == 200
+    assert result["problems"] == []
+
+
+def test_get_cart_details_multiple_items(cart_service):
+    """Test that totals include all items in the cart."""
+    cart_service.add_item(
+        customer_id=1, menu_item_id=1, quantity=2
+    )
+
+    cart_service.cart_repository.modify(
+        1,
+        lambda cart: cart["items"].append({
+            "menu_item_id": 3,
+            "quantity": 3,
+        }),
+    )
+
+    result = cart_service.get_cart_details(customer_id=1)
+
+    assert len(result["items"]) == 2
+    assert result["items"][0]["line_total"] == 200
+    assert result["items"][1]["line_total"] == 150
+    assert result["items"][1]["problems"] == ["unavailable"]
+    assert result["subtotal"] == 350
+    assert result["total"] == 350
+    assert result["problems"] == ["unavailable"]
+
+
+def test_get_cart_details_empty_cart(cart_service):
+    """Test that an empty cart has no items and zero totals."""
+    result = cart_service.get_cart_details(customer_id=1)
+
+    assert result["items"] == []
+    assert result["subtotal"] == 0
+    assert result["total"] == 0
+    assert result["problems"] == []
+
+
+def test_get_cart_details_missing_item(cart_service):
+    """Test that a missing menu item is reported in cart details."""
+    cart_service.cart_repository.modify(
+        1,
+        lambda cart: cart["items"].append({
+            "menu_item_id": 999,
+            "quantity": 2,
+        }),
+    )
+
+    result = cart_service.get_cart_details(customer_id=1)
+
+    assert len(result["items"]) == 1
+    assert result["items"][0] == {
+        "menu_item_id": 999,
+        "name": None,
+        "quantity": 2,
+        "unit_price": None,
+        "line_total": None,
+        "problems": ["missing"],
+    }
+    assert result["subtotal"] == 0
+    assert result["total"] == 0
+    assert result["problems"] == ["missing"]
+
+
+def test_get_cart_details_inactive_item(cart_service):
+    """Test that an inactive menu item is flagged in cart details."""
+    cart_service.cart_repository.modify(
+        1,
+        lambda cart: cart["items"].append({
+            "menu_item_id": 4,
+            "quantity": 2,
+        }),
+    )
+
+    result = cart_service.get_cart_details(customer_id=1)
+
+    assert len(result["items"]) == 1
+    assert result["items"][0] == {
+        "menu_item_id": 4,
+        "name": "Salad",
+        "quantity": 2,
+        "unit_price": 80,
+        "line_total": 160,
+        "problems": ["inactive"],
+    }
+    assert result["subtotal"] == 160
+    assert result["total"] == 160
+    assert result["problems"] == ["inactive"]
+
+
+def test_get_cart_details_no_active_cart(cart_service):
+    """Test that a missing active cart raises an error."""
+    with pytest.raises(CartNotFoundError):
+        cart_service.get_cart_details(customer_id=999)

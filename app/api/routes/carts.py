@@ -7,7 +7,7 @@ from fastapi import APIRouter, Depends, HTTPException, Response, status
 from app.api.dependencies import get_current_customer
 from app.repositories.cart_repo import CartRepo
 from app. repositories.menu_repo import MenuRepo
-from app.schemas.cart import Cart, CartItemAdd
+from app.schemas.cart import Cart, CartItemAdd, CartDetail
 from app.services.cart_service import (
     CartNotFoundError,
     CartRestaurantMismatchError,
@@ -60,11 +60,12 @@ def create_cart(
 
 @router.get(
     "/customers/me/cart",
-    response_model=Cart,
-    summary="Get active cart",
+    response_model=CartDetail,
+    summary="View my cart and total",
     description=(
-        "Retrieve the signed in customer's active cart."
-        "This endpoint doesn't create a new cart."
+        "Get the authenticated customer's active cart with current "
+        "menu item prices, quantities, line totals, subtotal, total, "
+        "and item problems."
     ),
     responses={
         401: {"description": "Authentication required"},
@@ -75,26 +76,23 @@ def create_cart(
 )
 def get_cart(
     account: Annotated[dict[str, Any], Depends(get_current_customer)],
-) -> Cart:
-    """Return the customer's active cart without creating one."""
+) -> CartDetail:
+    """Return the customer's active cart with calculated totals."""
     try:
-        cart = repository.get_active_for_customer(account["id"])
+        cart = service.get_cart_details(account["id"])
+        return CartDetail.model_validate(cart)
 
-        if cart is None:
-            raise HTTPException(
-                status_code=404,
-                detail="Active cart not found",
-            )
+    except CartNotFoundError as error:
+        raise HTTPException(
+            status_code=404,
+            detail="Active cart not found",
+        ) from error
 
-        validated_cart = Cart.model_validate(cart)
-
-    except (OSError, ValueError) as error:
+    except (OSError, ValueError, KeyError, TypeError) as error:
         raise HTTPException(
             status_code=500,
             detail="Cart storage is unavailable",
         ) from error
-
-    return validated_cart
 
 
 @router.post(
