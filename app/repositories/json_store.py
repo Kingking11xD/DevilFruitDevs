@@ -113,3 +113,34 @@ def update_shopping(
         result = change(shopping)
         _save(path, shopping)
         return result
+
+
+def run_checkout_transaction(
+        shopping_path: str | Path,
+        reference_paths: Mapping[str, str | Path],
+        change: Callable[[dict[str, list[dict]], dict[str, list[dict]]], Any],
+) -> Any:
+    """Read related data, run a checkout change and save shopping data atomically.
+ 
+    The shared lock is held from the first read until the save, so no other
+    request can change the cart, menu or account while checkout validates it.
+ 
+    ``reference_paths`` names the list files checkout needs to read, such as
+    accounts, restaurants and menu items. They are read without taking the
+    lock again and are never saved.
+ 
+    ``change`` receives the shopping data and the reference data. It may add
+    an order and close the cart in the shopping data. It must not call
+    ``read_records``, ``read_shopping`` or any repository method, because the
+    lock is already held. If ``change`` raises an error, nothing is saved.
+    """
+    shopping_path = Path(shopping_path).resolve()
+    resolved_paths = {name: Path(path).resolve() for name, path in reference_paths.items()}
+ 
+    with _storage_lock:
+        references = {name: _read(path) for name, path in resolved_paths.items()}
+        shopping = _read_shopping(shopping_path)
+        result = change(shopping, references)
+        _save(shopping_path, shopping)  # Order and closed cart are written in one replacement
+        return result
+ 
