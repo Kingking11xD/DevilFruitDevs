@@ -129,7 +129,16 @@ def test_checkout_total_changed(client: TestClient, files: dict[str, Path]) -> N
     response = client.post("/customers/me/checkout", json=CONFIRMED)
 
     assert response.status_code == 409
-    assert response.json()["detail"] == "Order total has changed, please review your cart"
+    assert response.json()["detail"] == {"message": "Order total has changed", "total": 3000}
     shopping = json.loads(files["shopping"].read_text(encoding="utf-8"))
     assert shopping["orders"] == []
     assert shopping["carts"][0]["status"] == "active"
+
+    new_total = response.json()["detail"]["total"]
+    retry = client.post("/customers/me/checkout", json={"expected_total": new_total})
+
+    assert retry.status_code == 201
+    assert retry.json()["total"] == 3000
+    shopping = json.loads(files["shopping"].read_text(encoding="utf-8"))
+    assert len(shopping["orders"]) == 1
+    assert shopping["carts"][0]["status"] == "closed"

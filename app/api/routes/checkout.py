@@ -51,7 +51,8 @@ def checkout(
         raise HTTPException(status_code=400, detail="Delivery address required") from error
     except TotalChangedError as error:
         raise HTTPException(
-            status_code=409, detail="Order total has changed, please review your cart") from error
+            status_code=409, 
+            detail={"message": "Order total has changed","total": error.total}) from error
     except UnavailableItemError as error:
         raise HTTPException(
             status_code=409, detail="Some items are no longer available") from error

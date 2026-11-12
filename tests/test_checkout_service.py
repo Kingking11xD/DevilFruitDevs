@@ -99,8 +99,9 @@ def test_checkout_uses_current_menu_prices(files: dict[str, Path]) -> None:
     """Test that a price change before checkout is rejected and nothing is saved."""
     update_file(files["menu_items"], lambda items: items[0].update(price=1500))
     before = files["shopping"].read_bytes()
-    with pytest.raises(TotalChangedError):
+    with pytest.raises(TotalChangedError) as error:
         make_service(files).checkout(1, CART_TOTAL)
+    assert error.value.total == 3400 
     assert files["shopping"].read_bytes() == before
 
 
