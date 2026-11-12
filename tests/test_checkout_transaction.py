@@ -1,9 +1,12 @@
 import json
+import time
 from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
+from threading import Event
+
 
 import pytest
-from app.repositories.json_store import read_records, run_checkout_transaction
+from app.repositories.json_store import read_records, run_checkout_transaction, update_records
 
 def write_json(path: Path, data) -> None:
     """Write JSON test data to a file."""
@@ -177,3 +180,54 @@ def test_concurrent_checkouts_create_one_order(files: dict[str, Path]) -> None:
     saved = json.loads(files["shopping"].read_text(encoding="utf-8"))
     assert len(saved["orders"]) == 1
     assert sorted(result is None for result in results) == [False, True]
+
+def test_nested_storage_call_fails_fast(files: dict[str, Path]) -> None:
+    """Test that calling a storage helper inside checkout raises an error instead of deadlocking."""
+    before = files["shopping"].read_bytes()
+
+    def read_inside_lock(shopping: dict, references: dict) -> None:
+        read_records(files["menu_items"])  # Takes the lock again
+
+    with ThreadPoolExecutor(max_workers=1) as worker:
+        future = worker.submit(
+            run_checkout_transaction, files["shopping"], references_for(files), read_inside_lock)
+        with pytest.raises(RuntimeError):
+            future.result(timeout=2)  # A deadlock would time out here instead
+
+    assert files["shopping"].read_bytes() == before
+    assert read_records(files["accounts"])[0]["id"] == 1  # Lock was released
+
+
+def test_menu_update_waits_for_checkout(files: dict[str, Path]) -> None:
+    """Test that a menu price change during checkout waits until the order is saved."""
+    events = []
+    checkout_running = Event()
+    update_started = Event()
+
+    def slow_checkout(shopping: dict, references: dict) -> dict:
+        checkout_running.set()  # Checkout now holds the lock
+        update_started.wait(timeout=2)
+        time.sleep(0.1)  # Give the menu update time to try (and wait for) the lock
+        order = place_order(shopping, references)
+        events.append("checkout saved")
+        return order
+
+    def raise_price(items: list) -> None:
+        items[0]["price"] = 9999
+        events.append("menu updated")
+
+    def update_menu() -> None:
+        checkout_running.wait(timeout=2)  # Only try once checkout is in progress
+        update_started.set()
+        update_records(files["menu_items"], raise_price)
+
+    with ThreadPoolExecutor(max_workers=2) as workers:
+        checkout = workers.submit(
+            run_checkout_transaction, files["shopping"], references_for(files), slow_checkout)
+        menu = workers.submit(update_menu)
+        order = checkout.result(timeout=5)
+        menu.result(timeout=5)
+
+    assert events == ["checkout saved", "menu updated"]
+    assert order["total"] == 2500  # Checkout used the price from before the update
+    assert read_records(files["menu_items"])[0]["price"] == 9999
