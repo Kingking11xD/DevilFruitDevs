@@ -3,6 +3,7 @@ from typing import Any
 from app.services.menu_service import MenuItemNotFoundError
 from app.repositories.cart_repo import CartRepo
 from app.repositories.menu_repo import MenuRepo
+from app.schemas.cart import Cart
 
 
 class CartNotFoundError(Exception):
@@ -55,6 +56,8 @@ class CartService:
                 or current_cart["customer_id"] != customer_id
             ):
                 raise CartNotFoundError("Active cart not found")
+            
+            Cart.model_validate(current_cart)
 
             restaurant_id = menu_item["restaurant_id"]
 
