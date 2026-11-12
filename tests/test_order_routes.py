@@ -17,6 +17,7 @@ def make_order(order_id: int, customer_id: int, created_at: str) -> dict:
     return {
         "id": order_id,
         "customer_id": customer_id,
+        "customer_name": "Test Customer",
         "restaurant_id": 1,
         "restaurant_name": "Test Restaurant",
         "source_cart_id": order_id,
