@@ -5,12 +5,14 @@ import pytest
 from app.repositories.cart_repo import CartRepo
 from app.repositories.menu_repo import MenuRepo
 from app.services.cart_service import (
+    CartItemNotFoundError,
     CartNotFoundError,
     CartRestaurantMismatchError,
     CartService,
     MenuItemNotAvailableError,
 )
 from app.services.menu_service import MenuItemNotFoundError
+from pydantic import ValidationError
 
 @pytest.fixture
 def cart_service(tmp_path):
@@ -106,6 +108,148 @@ def test_add_existing_item_increases_quantity(cart_service):
             "quantity": 5
         }
     ]
+
+
+def test_update_item_quantity_replaces_existing_quantity(cart_service):
+    """Test replacing an item's quantity instead of increasing it."""
+    cart_service.add_item(
+        customer_id=1,
+        menu_item_id=1,
+        quantity=2,
+    )
+
+    updated_cart = cart_service.update_item_quantity(
+        customer_id=1,
+        menu_item_id=1,
+        quantity=5,
+    )
+
+    assert updated_cart["items"] == [
+        {"menu_item_id": 1, "quantity": 5}
+    ]
+
+    saved_cart = cart_service.cart_repository.get_active_for_customer(1)
+    assert saved_cart["items"] == updated_cart["items"]
+
+    details = cart_service.get_cart_details(customer_id=1)
+    assert details["subtotal"] == 500
+    assert details["total"] == 500
+
+
+def test_update_item_quantity_invalid_quantity(cart_service):
+    """Test that an invalid quantity doesn't change the saved cart."""
+    cart_service.add_item(
+        customer_id=1,
+        menu_item_id=1,
+        quantity=2,
+    )
+
+    original_cart = cart_service.cart_repository.get_active_for_customer(1)
+
+    with pytest.raises(ValidationError):
+        cart_service.update_item_quantity(
+            customer_id=1,
+            menu_item_id=1,
+            quantity=0,
+        )
+
+    saved_cart = cart_service.cart_repository.get_active_for_customer(1)
+    assert saved_cart == original_cart
+
+
+def test_update_item_quantity_missing_item(cart_service):
+    """Test that updating a missing item leaves the cart unchanged."""
+    cart_service.add_item(
+        customer_id=1,
+        menu_item_id=1,
+        quantity=2,
+    )
+
+    original_cart = cart_service.cart_repository.get_active_for_customer(1)
+
+    with pytest.raises(CartItemNotFoundError):
+        cart_service.update_item_quantity(
+            customer_id=1,
+            menu_item_id=99,
+            quantity=5,
+        )
+
+    saved_cart = cart_service.cart_repository.get_active_for_customer(1)
+    assert saved_cart == original_cart
+
+
+def test_update_item_quantity_missing_cart(cart_service):
+    """Test that updating a missing cart doesn't change stored data."""
+    cart_service.add_item(
+        customer_id=1,
+        menu_item_id=1,
+        quantity=2,
+    )
+
+    original_cart = cart_service.cart_repository.get_active_for_customer(1)
+
+    with pytest.raises(CartNotFoundError):
+        cart_service.update_item_quantity(
+            customer_id=101,
+            menu_item_id=1,
+            quantity=5,
+        )
+
+    saved_cart = cart_service.cart_repository.get_active_for_customer(1)
+    assert saved_cart == original_cart
+
+
+def test_update_item_quantity_only_own_cart(cart_service):
+    """Test that updating one customer's cart doesn't affect another."""
+    cart_service.cart_repository.create(customer_id=2)
+
+    cart_service.add_item(
+        customer_id=1,
+        menu_item_id=1,
+        quantity=2,
+    )
+    cart_service.add_item(
+        customer_id=2,
+        menu_item_id=1,
+        quantity=3,
+    )
+
+    cart_service.update_item_quantity(
+        customer_id=2,
+        menu_item_id=1,
+        quantity=5,
+    )
+
+    cart_1 = cart_service.cart_repository.get_active_for_customer(1)
+    cart_2 = cart_service.cart_repository.get_active_for_customer(2)
+
+    assert cart_1["items"][0]["quantity"] == 2
+    assert cart_2["items"][0]["quantity"] == 5
+
+
+def test_update_item_quantity_invalid_saved_cart_unchanged(cart_service):
+    """Test that invalid saved cart data is not modified."""
+    cart_service.add_item(
+        customer_id=1,
+        menu_item_id=1,
+        quantity=2,
+    )
+
+    cart_file = cart_service.cart_repository.file_path
+    shopping = json.loads(cart_file.read_text())
+    shopping["carts"][0]["items"][0]["quantity"] = 0
+    cart_file.write_text(json.dumps(shopping))
+
+    original_data = cart_file.read_text()
+
+    with pytest.raises(ValidationError):
+        cart_service.update_item_quantity(
+            customer_id=1,
+            menu_item_id=1,
+            quantity=5,
+        )
+
+    assert cart_file.read_text() == original_data
 
 
 def test_add_unavailable_item(cart_service):
