@@ -1,6 +1,6 @@
 import json
 import os
-from collections.abc import Callable
+from collections.abc import Callable, Mapping
 from pathlib import Path
 from tempfile import NamedTemporaryFile
 from threading import Lock
