@@ -31,17 +31,22 @@ class EmptyCartError(CheckoutError):
 class UnavailableItemError(CheckoutError):
     """The restaurant or a menu item is missing, unavailable or doesn't match the cart."""
 
+
 class TotalChangedError(CheckoutError):
-    """The current total differs from the total the customer confirmed."""
+    """The current total differs from the total the customer saw in their cart."""
+
     def __init__(self, total: int) -> None:
         super().__init__(total)
         self.total = total
 
+
 def _utc_now() -> str:
+    """Return the current UTC time in the format saved on orders."""
     return datetime.now(timezone.utc).isoformat(timespec="seconds").replace("+00:00", "Z")
 
 
 def _find(records: list[dict[str, Any]], record_id: Any) -> dict[str, Any] | None:
+    """Return the record with the given ID, or None."""
     return next((record for record in records if record["id"] == record_id), None)
 
 
@@ -55,6 +60,7 @@ class CheckoutService:
             restaurants_path: str | Path | None = None,
             menu_items_path: str | Path | None = None,
             clock: Callable[[], str] = _utc_now) -> None:
+        """Initialize the service with the data files it reads and the clock it uses."""
         self.shopping_path = shopping_path or data_path("shopping.json")
         self.reference_paths = {
             "accounts": accounts_path or data_path("accounts.json"),
@@ -65,7 +71,12 @@ class CheckoutService:
 
     def checkout(self, customer_id: int, expected_total: int) -> dict[str, Any]:
         """Validate the customer's active cart, save it as an order and close the cart.
-        If any check fails, nothing is saved."""
+
+        Everything runs while the shared storage lock is held, so prices,
+        availability and the account can't change between validation and saving.
+        If any check fails, or the total differs from ``expected_total``,
+        nothing is saved and the cart stays active.
+        """
 
         def place_order(shopping: dict[str, list[dict]], references: dict[str, list[dict]]) -> dict[str, Any]:
             customer = _find(references["accounts"], customer_id)
@@ -86,7 +97,7 @@ class CheckoutService:
 
             restaurant = _find(references["restaurants"], cart["restaurant_id"])
             if restaurant is None or not restaurant.get("active", True):
-                raise UnavailableItemError("Restaurant is not accepting orders for this item")
+                raise UnavailableItemError("Restaurant is not accepting orders")
 
             menu_items = {item["id"]: item for item in references["menu_items"]}
             for cart_item in cart["items"]:
@@ -102,6 +113,7 @@ class CheckoutService:
             prices = price_items(cart["items"], menu_items)
             if prices["total"] != expected_total:
                 raise TotalChangedError(prices["total"])  # Customer must review the new total
+
             order = {
                 "id": max((order["id"] for order in shopping["orders"]), default=0) + 1,
                 "customer_id": customer_id,
@@ -114,10 +126,10 @@ class CheckoutService:
                 "delivery_address": customer["delivery_address"],
                 **prices,
             }
-            Order.model_validate(order) #order that breaks the order rules is never saved
+            Order.model_validate(order)  # Never save an order that breaks the order rules
 
             shopping["orders"].append(order)
-            cart["status"] = "closed"  # saved in the same write as the order
+            cart["status"] = "closed"  # Saved in the same write as the order
             return order
 
         return run_checkout_transaction(self.shopping_path, self.reference_paths, place_order)
