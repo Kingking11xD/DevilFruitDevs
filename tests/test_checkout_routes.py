@@ -11,6 +11,7 @@ from app.api.routes.checkout import get_checkout_service, router
 from app.services.checkout_service import CheckoutService
 
 CUSTOMER = {"id": 1, "name": "Ana Lopez", "role": "customer", "active": True}
+CONFIRMED = {"expected_total": 2500}  # 2 x Burger (1250)
 
 
 def write_json(path: Path, data) -> None:
@@ -72,7 +73,7 @@ def change_shopping(files: dict[str, Path], change) -> None:
 
 def test_checkout_success(client: TestClient, files: dict[str, Path]) -> None:
     """Test that checkout returns 201 with the created order."""
-    response = client.post("/customers/me/checkout")
+    response = client.post("/customers/me/checkout", json=CONFIRMED)
 
     assert response.status_code == 201
     body = response.json()
@@ -83,9 +84,9 @@ def test_checkout_success(client: TestClient, files: dict[str, Path]) -> None:
 
 def test_checkout_no_active_cart(client: TestClient, files: dict[str, Path]) -> None:
     """Test that checking out twice returns 404 the second time because the cart is closed."""
-    client.post("/customers/me/checkout")
+    client.post("/customers/me/checkout", json=CONFIRMED)
 
-    response = client.post("/customers/me/checkout")
+    response = client.post("/customers/me/checkout", json=CONFIRMED)
 
     assert response.status_code == 404
     assert response.json()["detail"] == "No active cart"
@@ -95,7 +96,7 @@ def test_checkout_empty_cart(client: TestClient, files: dict[str, Path]) -> None
     """Test that an empty cart returns 400."""
     change_shopping(files, lambda shopping: shopping["carts"][0].update(items=[]))
 
-    response = client.post("/customers/me/checkout")
+    response = client.post("/customers/me/checkout", json=CONFIRMED)
 
     assert response.status_code == 400
     assert response.json()["detail"] == "Cart is empty"
@@ -107,13 +108,28 @@ def test_checkout_unavailable_item(client: TestClient, files: dict[str, Path]) -
         {"id": 1, "restaurant_id": 1, "name": "Burger", "price": 1250, "available": False},
     ])
 
-    response = client.post("/customers/me/checkout")
+    response = client.post("/customers/me/checkout", json=CONFIRMED)
 
     assert response.status_code == 409
 
 
 def test_checkout_requires_authentication(app: FastAPI) -> None:
     """Test that checkout without a token returns 401."""
-    response = TestClient(app).post("/customers/me/checkout")
+    response = TestClient(app).post("/customers/me/checkout", json=CONFIRMED)
 
     assert response.status_code == 401
+
+
+def test_checkout_total_changed(client: TestClient, files: dict[str, Path]) -> None:
+    """Test that a changed total returns 409 and keeps the cart open."""
+    write_json(files["menu_items"], [
+        {"id": 1, "restaurant_id": 1, "name": "Burger", "price": 1500, "available": True},
+    ])
+
+    response = client.post("/customers/me/checkout", json=CONFIRMED)
+
+    assert response.status_code == 409
+    assert response.json()["detail"] == "Order total has changed, please review your cart"
+    shopping = json.loads(files["shopping"].read_text(encoding="utf-8"))
+    assert shopping["orders"] == []
+    assert shopping["carts"][0]["status"] == "active"

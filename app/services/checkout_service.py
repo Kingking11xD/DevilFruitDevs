@@ -31,6 +31,11 @@ class EmptyCartError(CheckoutError):
 class UnavailableItemError(CheckoutError):
     """The restaurant or a menu item is missing, unavailable or doesn't match the cart."""
 
+class TotalChangedError(CheckoutError):
+    """The current total differs from the total the customer confirmed."""
+    def __init__(self, total: int) -> None:
+        super().__init__(total)
+        self.total = total
 
 def _utc_now() -> str:
     return datetime.now(timezone.utc).isoformat(timespec="seconds").replace("+00:00", "Z")
@@ -58,7 +63,7 @@ class CheckoutService:
         }
         self.clock = clock
 
-    def checkout(self, customer_id: int) -> dict[str, Any]:
+    def checkout(self, customer_id: int, expected_total: int) -> dict[str, Any]:
         """Validate the customer's active cart, save it as an order and close the cart.
         If any check fails, nothing is saved."""
 
@@ -95,6 +100,8 @@ class CheckoutService:
                     raise UnavailableItemError(cart_item["menu_item_id"])
 
             prices = price_items(cart["items"], menu_items)
+            if prices["total"] != expected_total:
+                raise TotalChangedError(prices["total"])  # Customer must review the new total
             order = {
                 "id": max((order["id"] for order in shopping["orders"]), default=0) + 1,
                 "customer_id": customer_id,

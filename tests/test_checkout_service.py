@@ -4,9 +4,10 @@ from pathlib import Path
 import pytest
 from app.services.checkout_service import (
     CheckoutService, InactiveCustomerError, MissingAddressError, NoActiveCartError,
-    UnavailableItemError)
+    TotalChangedError, UnavailableItemError)
 
 NOW = "2026-11-15T18:00:00Z"
+CART_TOTAL = 2900
 
 def write_json(path: Path, data) -> None:
     """Write JSON test data to a file."""
@@ -74,7 +75,7 @@ def update_file(path: Path, change) -> None:
 
 def test_checkout_creates_order_and_closes_cart(files: dict[str, Path]) -> None:
     """Test that a valid cart becomes a saved order and the cart is closed."""
-    order = make_service(files).checkout(1)
+    order = make_service(files).checkout(1, CART_TOTAL)
 
     assert order["id"] == 1
     assert order["source_cart_id"] == 5
@@ -95,18 +96,17 @@ def test_checkout_creates_order_and_closes_cart(files: dict[str, Path]) -> None:
 
 
 def test_checkout_uses_current_menu_prices(files: dict[str, Path]) -> None:
-    """Test that checkout recalculates prices from the current menu data."""
+    """Test that a price change before checkout is rejected and nothing is saved."""
     update_file(files["menu_items"], lambda items: items[0].update(price=1500))
-
-    order = make_service(files).checkout(1)
-
-    assert order["items"][0]["unit_price"] == 1500
-    assert order["subtotal"] == 3400
+    before = files["shopping"].read_bytes()
+    with pytest.raises(TotalChangedError):
+        make_service(files).checkout(1, CART_TOTAL)
+    assert files["shopping"].read_bytes() == before
 
 
 def test_order_snapshot_survives_later_changes(files: dict[str, Path]) -> None:
     """Test that later menu and address changes don't rewrite a saved order."""
-    order = make_service(files).checkout(1)
+    order = make_service(files).checkout(1, CART_TOTAL)
     update_file(files["menu_items"], lambda items: items[0].update(price=9999, name="New Burger"))
     update_file(files["accounts"], lambda accounts: accounts[0].update(delivery_address="456 New Rd"))
 
@@ -130,7 +130,7 @@ def test_checkout_rejects_invalid_customer(files: dict[str, Path], change, error
     before = files["shopping"].read_bytes()
 
     with pytest.raises(error):
-        make_service(files).checkout(1)
+        make_service(files).checkout(1,  CART_TOTAL)
 
     assert files["shopping"].read_bytes() == before
 
@@ -148,7 +148,7 @@ def test_checkout_rejects_unavailable_items(files: dict[str, Path], file_name: s
     before = files["shopping"].read_bytes()
 
     with pytest.raises(UnavailableItemError):
-        make_service(files).checkout(1)
+        make_service(files).checkout(1, CART_TOTAL)
 
     assert files["shopping"].read_bytes() == before
 
@@ -158,6 +158,6 @@ def test_checkout_only_uses_own_cart(files: dict[str, Path]) -> None:
         {"id": 2, "name": "Ben", "role": "customer", "active": True, "delivery_address": "9 Elm St"}))
 
     with pytest.raises(NoActiveCartError):
-        make_service(files).checkout(2)
+        make_service(files).checkout(2, CART_TOTAL)
 
     assert read_json(files["shopping"])["carts"][0]["status"] == "active"
