@@ -1075,3 +1075,15 @@ def test_update_cart_item_storage_error(client, monkeypatch):
     assert response.status_code == 500
     assert response.json()["detail"] == "Cart storage is unavailable"
     assert cart_file.read_text() == original_data
+
+
+@pytest.mark.parametrize("item_id", [0, -1, "abc"])
+def test_update_cart_item_invalid_id(client, item_id):
+    """Test that invalid item IDs return 422."""
+    response = client.patch(
+        f"/customers/me/cart/items/{item_id}",
+        json={"quantity": 5},
+    )
+
+    assert response.status_code == 422
+    assert carts.repository.get_all() == []

@@ -2,7 +2,7 @@
 
 from typing import Annotated, Any
 
-from fastapi import APIRouter, Depends, HTTPException, Response, status
+from fastapi import APIRouter, Depends, HTTPException, Response, status, Path
 
 from app.api.dependencies import get_current_customer
 from app.repositories.cart_repo import CartRepo
@@ -170,7 +170,7 @@ def add_cart_item(
     },
 )
 def update_cart_item_quantity(
-    item_id: int,
+    item_id: Annotated[int, Path(gt=0)],
     item: CartItemUpdate,
     account: Annotated[dict[str, Any], Depends(get_current_customer)],
 ) -> CartDetail:
