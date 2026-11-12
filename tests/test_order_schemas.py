@@ -7,6 +7,7 @@ def valid_order_data() -> dict:
     return {
         "id": 1,
         "customer_id": 2,
+        "customer_name": "Ana Lopez",
         "restaurant_id": 3,
         "restaurant_name": "Test Restaurant",
         "source_cart_id": 4,
@@ -31,6 +32,7 @@ def test_order_model_valid() -> None:
     order = Order(**valid_order_data())
 
     assert order.id == 1
+    assert order.customer_name == "Ana Lopez"
     assert order.status == "placed"
     assert order.items[0].line_total == 2500
     assert order.total == 2500
@@ -43,6 +45,8 @@ def test_order_model_valid() -> None:
         ("items", []),
         ("total", -1),
         ("source_cart_id", 0),
+        ("customer_name", ""),
+        ("customer_name", "a" * 101),
         ("restaurant_name", ""),
         ("delivery_address", ""),
         ("delivery_address", "a" * 501),

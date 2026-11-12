@@ -22,6 +22,7 @@ class Order(BaseModel):
     """show saved order created from customer's cart"""
     id: int = Field(gt=0)
     customer_id: int = Field(gt=0)
+    customer_name: str = Field(min_length=1, max_length=100)
     restaurant_id: int = Field(gt=0)
     restaurant_name: str = Field(min_length=1)
     source_cart_id: int = Field(gt=0)
