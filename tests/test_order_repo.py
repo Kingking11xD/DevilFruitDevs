@@ -6,7 +6,7 @@ def make_order(order_id: int, customer_id: int, source_cart_id: int, created_at:
     """Return a valid order record for tests."""
     return {
         "id": order_id,
-        "customer_id": "Test Customer",
+        "customer_id": customer_id,
         "restaurant_id": 1,
         "restaurant_name": "Test Restaurant",
         "source_cart_id": source_cart_id,
@@ -45,15 +45,19 @@ def test_order_repo_get_by_id(tmp_path: Path) -> None:
     assert repo.get_by_id(999) is None
 
 def test_order_repo_get_for_customer_newest_first(tmp_path: Path) -> None:
-    """Test that only a customer's orders are returned, newest first."""
+    """Test that only a customer's orders are returned, newest first by creation time."""
     path = tmp_path / "shopping.json"
-    orders = [make_order(1, 1, 1), make_order(2, 2, 2), make_order(3, 1, 3)]
+    orders = [
+        make_order(1, 1, 1, "2026-11-15T18:00:00Z"),
+        make_order(2, 2, 2, "2026-11-16T18:00:00Z"),
+        make_order(3, 1, 3, "2026-11-14T18:00:00Z"),  # Higher ID but older
+        make_order(4, 1, 4, "2026-11-17T09:30:00+00:00"),
+    ]
     write_shopping(path, orders=orders)
     repo = OrderRepo(path)
-
     result = repo.get_for_customer(1)
 
-    assert [order["id"] for order in result] == [3, 1]
+    assert [order["id"] for order in result] == [4, 1, 3]
     assert all(order["customer_id"] == 1 for order in result)
 
  
