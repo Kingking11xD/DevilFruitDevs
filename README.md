@@ -19,8 +19,6 @@ After running the application open another terminal\
 cd frontend \
 npm run dev
 
-
-
 **API endpoints:**   
 Health check: `http://127.0.0.1:8000/health`  
 Restaurant list: `http://127.0.0.1:8000/restaurants`  
@@ -53,6 +51,20 @@ Send the token with protected requests:
     Authorization: Bearer <token>
 
 Tokens expire after 30 minutes. Restarting the backend clears them, so users must sign in again. Saved accounts remain. Run one backend process.
+
+For a local demo, activate your Python environment, stop any running backend, and run from the project root:
+
+```powershell
+python setup_demo_account.py --demo
+```
+
+The command prepares data in `.devilfruitdevs-demo` inside your user folder and starts the backend automatically. No `DATA_DIR` setup is needed.
+
+On the first run, choose a 12-128 character password and enter it twice. Password typing shows stars on Python 3.14+ and stays hidden on older versions. Open `http://127.0.0.1:8000/docs` and use `POST /auth/login` with `bulma@email.com` (admin) or `vegeta@email.com` (restaurant user) and that password. Vegeta is assigned to the first restaurant in the demo data.
+
+Later runs keep existing data and passwords. Press Ctrl+C to stop. For custom account options, run `python setup_demo_account.py --help`. Public registration still creates customers only.
+
+For permissions routes can use `Depends(get_current_admin)` or `Depends(get_restaurant_manager)` from `app/api/dependencies.py`. Services can use `require_owner(account, customer_id)` from `app/services/permissions.py`. Map ownership failures to 404. Invalid tokens return 401 and blocked access returns 403. Feature owners still need to connect and test these helpers on their endpoints.
 
 **Data storage:**  
 Restaurants are saved in `data/restaurants.json` and accounts in `data/accounts.json`. The included accounts file starts as an empty JSON list. To change the folder before starting the app:

@@ -31,6 +31,41 @@ def test_create_account(repository: AccountRepo) -> None:
     assert reloaded.get_by_email(" JimBOB@email.com ") == account
 
 
+@pytest.mark.parametrize("role, restaurant_ids", [
+    ("admin", []), ("restaurant_user", [1, 2])])
+def test_create_staff(
+        repository: AccountRepo, role: str, restaurant_ids: list[int]) -> None:
+    customer = repository.create("JimBOB", "JimBOB@email.com", "test-hash")
+    staff = repository.create_staff(
+        "Staff", " STAFF@example.com ", "staff-hash", role, restaurant_ids)
+
+    assert staff["id"] == customer["id"] + 1
+    assert staff["email"] == "staff@example.com"
+    assert staff["role"] == role
+    assert staff["managed_restaurant_ids"] == restaurant_ids
+    assert staff["active"] is True
+
+    reloaded = AccountRepo(repository.file_path)
+    assert reloaded.get_by_id(staff["id"]) == staff
+    assert reloaded.get_by_id(customer["id"]) == customer
+
+
+@pytest.mark.parametrize("role, restaurant_ids", [
+    ("customer", []), ("unknown", []), ("admin", [1]),
+    ("restaurant_user", [0]), ("restaurant_user", [-1]),
+    ("restaurant_user", [True]), ("restaurant_user", ["1"])])
+def test_invalid_staff_keeps_data(
+        repository: AccountRepo, role: str, restaurant_ids: list[int]) -> None:
+    repository.create("JimBOB", "JimBOB@email.com", "test-hash")
+    before = repository.file_path.read_bytes()
+
+    with pytest.raises(ValueError):
+        repository.create_staff(
+            "Staff", "staff@example.com", "staff-hash", role, restaurant_ids)
+
+    assert repository.file_path.read_bytes() == before
+
+
 def test_ids_continue_after_reload(repository: AccountRepo) -> None:
     first = repository.create("JimBOB", "JimBOB@email.com", "test-pw")
     second = repository.create("vegeta", "vegeta@email.com", "test-pw")
@@ -51,6 +86,10 @@ def test_duplicate_email_keeps_data(repository: AccountRepo) -> None:
 
     with pytest.raises(AccountEmailExistsError):
         repository.create("Other", " JimBOB@email.com ", "other-hash")
+
+    with pytest.raises(AccountEmailExistsError):
+        repository.create_staff(
+            "Other", " JIMBOB@email.com ", "other-hash", "admin", [])
 
     assert repository.file_path.read_bytes() == before
 
@@ -92,6 +131,10 @@ def test_failed_save_keeps_accounts(
 
     with pytest.raises(OSError):
         repository.create("vegeta", "vegeta@email.com", "test-pw")
+
+    with pytest.raises(OSError):
+        repository.create_staff(
+            "Bulma", "bulma@email.com", "staff-hash", "admin", [])
 
     with pytest.raises(OSError):
         repository.update(account["id"], {"name": "Ram Altman"})
