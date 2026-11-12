@@ -784,3 +784,40 @@ def test_get_cart_invalid_menu_price(client, monkeypatch):
     assert response.json() == {
         "detail": "Cart storage is unavailable"
     }
+
+
+def test_add_item_invalid_saved_cart_unchanged(client):
+    """Test that a failed addition doesn't modify an invalid cart."""
+    created = client.post("/customers/me/cart")
+    assert created.status_code == 201
+
+    cart = created.json()
+    cart["restaurant_id"] = 1
+    cart["items"] = [
+        {"menu_item_id": 3, "quantity": 0}
+    ]
+
+    shopping_data = {
+        "carts": [cart],
+        "orders": [],
+    }
+
+    carts.repository.file_path.write_text(
+        json.dumps(shopping_data)
+    )
+
+    response = client.post(
+        "/customers/me/cart/items",
+        json={
+            "menu_item_id": 1,
+            "quantity": 2,
+        },
+    )
+
+    assert response.status_code == 500
+    assert response.json() == {
+        "detail": "Cart storage is unavailable"
+    }
+
+    saved_cart = carts.repository.get_by_id(cart["id"])
+    assert saved_cart == cart
