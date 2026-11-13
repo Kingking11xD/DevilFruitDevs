@@ -1362,6 +1362,15 @@ def test_clear_cart_removes_items_and_resets_totals(client):
     )
     assert added.status_code == 200
 
+    def add_second_item(cart):
+        """Add another menu item to test clearing all items."""
+        cart["items"].append({"menu_item_id": 3, "quantity": 1})
+
+    carts.repository.modify(created.json()["id"], add_second_item)
+
+    saved_cart = carts.repository.get_by_id(created.json()["id"])
+    assert len(saved_cart["items"]) == 2
+
     response = client.delete("/customers/me/cart/items")
 
     assert response.status_code == 204
