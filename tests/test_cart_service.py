@@ -481,7 +481,7 @@ def test_remove_cart_item_cart_closed_before_modify(
         """Simulate the cart closing before removal."""
         repo.update(cart_id, {"status": "closed"})
         return original_modify(cart_id, change)
-    
+
     monkeypatch.setattr(repo, "modify", close_before_modify)
 
     with pytest.raises(CartNotFoundError):
@@ -490,12 +490,12 @@ def test_remove_cart_item_cart_closed_before_modify(
             menu_item_id=1,
         )
 
-        saved_cart = repo.get_by_id(1)
-        assert saved_cart["status"] == "closed"
-        assert saved_cart["items"] == [
-            {"menu_item_id": 1, "quantity": 2}
-        ]
-        assert saved_cart["restaurant_id"] == 1
+    saved_cart = repo.get_by_id(1)
+    assert saved_cart["status"] == "closed"
+    assert saved_cart["items"] == [
+        {"menu_item_id": 1, "quantity": 2}
+    ]
+    assert saved_cart["restaurant_id"] == 1
 
 
 def test_add_unavailable_item(cart_service):

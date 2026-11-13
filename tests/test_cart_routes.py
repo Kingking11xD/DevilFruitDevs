@@ -1343,7 +1343,7 @@ def test_remove_cart_item_invalid_id(client, item_id):
     cart_file = carts.repository.file_path
     original_data = cart_file.read_text()
 
-    response = client.delete("/customers/me/cart/items/{item_id}")
+    response = client.delete(f"/customers/me/cart/items/{item_id}")
 
     assert response.status_code == 422
     assert cart_file.read_text() == original_data
