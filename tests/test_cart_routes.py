@@ -1087,3 +1087,263 @@ def test_update_cart_item_invalid_id(client, item_id):
 
     assert response.status_code == 422
     assert carts.repository.get_all() == []
+
+
+def test_remove_last_cart_item(client):
+    """Test DELETE removes the last item and updates the cart."""
+    created = client.post("/customers/me/cart")
+    assert created.status_code == 201
+
+    added = client.post(
+        "/customers/me/cart/items",
+        json={"menu_item_id": 1, "quantity": 2},
+    )
+    assert added.status_code == 200
+
+    response = client.delete("/customers/me/cart/items/1")
+
+    assert response.status_code == 204
+    assert response.content == b""
+
+    saved_cart = carts.repository.get_active_for_customer(
+        created.json()["customer_id"]
+    )
+    assert saved_cart["items"] == []
+    assert saved_cart["restaurant_id"] is None
+
+    details = client.get("/customers/me/cart")
+    assert details.status_code == 200
+    assert details.json()["items"] == []
+    assert details.json()["subtotal"] == 0
+    assert details.json()["total"] == 0
+
+
+def test_remove_cart_item_keeps_other_items(client):
+    """Test DELETE removes only the requested item and updates totals."""
+    created = client.post("/customers/me/cart")
+    assert created.status_code == 201
+
+    added = client.post(
+        "/customers/me/cart/items",
+        json={"menu_item_id": 1, "quantity": 2},
+    )
+    assert added.status_code == 200
+
+    repo = carts.repository
+    cart = repo.get_active_for_customer(created.json()["customer_id"])
+
+    repo.modify(
+        cart["id"],
+        lambda current: current["items"].append({
+            "menu_item_id": 3,
+            "quantity": 3,
+        }),
+    )
+
+    response = client.delete("/customers/me/cart/items/1")
+
+    assert response.status_code == 204
+    assert response.content == b""
+
+    saved_cart = repo.get_active_for_customer(created.json()["customer_id"])
+    assert saved_cart["items"] == [
+        {"menu_item_id": 3, "quantity": 3}
+    ]
+    assert saved_cart["restaurant_id"] == 1
+
+    details = client.get("/customers/me/cart")
+    assert details.status_code == 200
+    assert details.json()["subtotal"] == 150
+    assert details.json()["total"] == 150
+
+
+def test_remove_cart_item_not_found(client):
+    """Test DELETE returns 404 and keeps the cart unchanged."""
+    created = client.post("/customers/me/cart")
+    assert created.status_code == 201
+
+    added = client.post(
+        "/customers/me/cart/items",
+        json={"menu_item_id": 1, "quantity": 2},
+    )
+    assert added.status_code == 200
+
+    cart_file = carts.repository.file_path
+    original_data = cart_file.read_text()
+
+    response = client.delete("/customers/me/cart/items/20")
+
+    assert response.status_code == 404
+    assert response.json() == {"detail": "Cart item not found"}
+    assert cart_file.read_text() == original_data
+
+
+def test_remove_cart_item_no_active_cart(client):
+    """Test DELETE returns 404 when no active cart exists."""
+    cart_file = carts.repository.file_path
+    original_data = cart_file.read_text()
+
+    response = client.delete("/customers/me/cart/items/1")
+
+    assert response.status_code == 404
+    assert response.json() == {"detail": "Active cart not found"}
+    assert cart_file.read_text() == original_data
+
+
+def test_remove_cart_item_requires_authentication(client):
+    """Test DELETE requires authentication and preserves cart data."""
+    created = client.post("/customers/me/cart")
+    assert created.status_code == 201
+
+    added = client.post(
+        "/customers/me/cart/items",
+        json={"menu_item_id": 1, "quantity": 2},
+    )
+    assert added.status_code == 200
+
+    cart_file = carts.repository.file_path
+    original_data = cart_file.read_text()
+
+    client.headers.pop("Authorization")
+
+    response = client.delete("/customers/me/cart/items/1")
+
+    assert response.status_code == 401
+    assert response.json() == {"detail": "Authentication required"}
+    assert cart_file.read_text() == original_data
+
+
+def test_remove_cart_item_deactivated_customer(client):
+    """Test that inactive customers can't remove cart items."""
+    created = client.post("/customers/me/cart")
+    assert created.status_code == 201
+
+    added = client.post(
+        "/customers/me/cart/items",
+        json={"menu_item_id": 1, "quantity": 2},
+    )
+    assert added.status_code == 200
+
+    cart_file = carts.repository.file_path
+    original_data = cart_file.read_text()
+
+    deactivated = client.post("/customers/me/deactivate")
+    assert deactivated.status_code == 200
+
+    response = client.delete("/customers/me/cart/items/1")
+
+    assert response.status_code == 403
+    assert response.json() == {"detail": "Account is inactive"}
+    assert cart_file.read_text() == original_data
+
+
+def test_customer_cannot_remove_another_cart_item(client):
+    """Test that customers can't remove another customer's items."""
+    first_cart = client.post("/customers/me/cart")
+    assert first_cart.status_code == 201
+
+    added = client.post(
+        "/customers/me/cart/items",
+        json={"menu_item_id": 1, "quantity": 2},
+    )
+    assert added.status_code == 200
+
+    cart_file = carts.repository.file_path
+    original_data = cart_file.read_text()
+
+    registration = client.post(
+        "/customers",
+        json={
+            "name": "Customer",
+            "email": "cust@example.com",
+            "password": "Password123!",
+        },
+    )
+    assert registration.status_code == 201
+
+    login = client.post(
+        "/auth/login",
+        json={
+            "email": "cust@example.com",
+            "password": "Password123!",
+        },
+    )
+    assert login.status_code == 200
+
+    client.headers["Authorization"] = (
+        f"Bearer {login.json()['access_token']}"
+    )
+
+    response = client.delete("/customers/me/cart/items/1")
+
+    assert response.status_code == 404
+    assert response.json() == {"detail": "Active cart not found"}
+    assert cart_file.read_text() == original_data
+
+
+def test_remove_cart_item_invalid_saved_data_unchanged(client):
+    """Test DELETE rejects invalid saved data without modifying it."""
+    created = client.post("/customers/me/cart")
+    assert created.status_code == 201
+
+    added = client.post(
+        "/customers/me/cart/items",
+        json={"menu_item_id": 1, "quantity": 2},
+    )
+    assert added.status_code == 200
+
+    cart_file = carts.repository.file_path
+    shopping = json.loads(cart_file.read_text())
+    shopping["carts"][0]["items"][0]["quantity"] = 0
+    cart_file.write_text(json.dumps(shopping))
+
+    original_data = cart_file.read_text()
+
+    response = client.delete("/customers/me/cart/items/1")
+
+    assert response.status_code == 500
+    assert response.json() == {"detail": "Cart storage is unavailable"}
+    assert cart_file.read_text() == original_data
+
+
+def test_remove_cart_item_storage_error(client):
+    """Test DELETE handles invalid JSON without changing saved data."""
+    created = client.post("/customers/me/cart")
+    assert created.status_code == 201
+
+    added = client.post(
+        "/customers/me/cart/items",
+        json={"menu_item_id": 1, "quantity": 2},
+    )
+    assert added.status_code == 200
+
+    cart_file = carts.repository.file_path
+    cart_file.write_text("{invalid json}")
+    original_data = cart_file.read_text()
+
+    response = client.delete("/customers/me/cart/items/1")
+
+    assert response.status_code == 500
+    assert response.json() == {"detail": "Cart storage is unavailable"}
+    assert cart_file.read_text() == original_data
+
+
+@pytest.mark.parametrize("item_id", [0, -1, "abc"])
+def test_remove_cart_item_invalid_id(client, item_id):
+    """Test DELETE rejects invalid item IDs without changing saved data."""
+    created = client.post("/customers/me/cart")
+    assert created.status_code == 201
+
+    added = client.post(
+        "/customers/me/cart/items",
+        json={"menu_item_id": 1, "quantity": 2},
+    )
+    assert added.status_code == 200
+
+    cart_file = carts.repository.file_path
+    original_data = cart_file.read_text()
+
+    response = client.delete("/customers/me/cart/items/{item_id}")
+
+    assert response.status_code == 422
+    assert cart_file.read_text() == original_data
