@@ -184,24 +184,58 @@ export default function CustomerApp() {
 
   if (profile) {
     return (
-      <div style={{ maxWidth: '600px', margin: '0 auto', textAlign: 'center' }}>
-        <h3 style={{ color: '#8b0000', marginBottom: '0.5rem', fontSize: '2.2rem', textTransform: 'uppercase' }}>
-          Ahoy, {profile.name}! 🏴‍☠️
-        </h3>
+      <div style={{ maxWidth: '650px', margin: '0 auto', textAlign: 'center' }}>
         {renderMessage()}
         
-        <div style={{ marginBottom: '2rem', padding: '2rem', border: '2px dashed #a67b5b', backgroundColor: 'rgba(255,255,255,0.6)', borderRadius: '12px', boxShadow: '0 4px 6px rgba(0,0,0,0.05)' }}>
-          <h4 style={{ color: '#3e2723', marginTop: 0, borderBottom: '2px solid #a67b5b', paddingBottom: '0.75rem', fontSize: '1.2rem' }}>Update Crew Manifest</h4>
-          
-          <form onSubmit={handleUpdateName} style={{ display: 'flex', gap: '1rem', marginBottom: '1.5rem', alignItems: 'center', flexWrap: 'wrap' }}>
-            <input value={name} onChange={e => setName(e.target.value)} placeholder="Your Pirate Name" required style={{...inputStyle, flex: 1, minWidth: '200px'}} />
-            <button type="submit" style={{...btnStyle, width: 'auto', whiteSpace: 'nowrap', padding: '0.85rem 1.5rem'}}>Update Name</button>
-          </form>
+        {/* WANTED POSTER PROFILE VIEW */}
+        <div style={{ 
+          backgroundColor: '#eaddcf', 
+          border: '10px solid #3e2723', 
+          padding: '2.5rem', 
+          boxShadow: '8px 8px 15px rgba(0,0,0,0.3)', 
+          position: 'relative',
+          marginBottom: '2rem'
+        }}>
+          {/* Decorative Corner Pins */}
+          <div style={{ position: 'absolute', top: '10px', left: '10px', width: '12px', height: '12px', backgroundColor: '#8b0000', borderRadius: '50%', border: '2px solid #3e2723' }}></div>
+          <div style={{ position: 'absolute', top: '10px', right: '10px', width: '12px', height: '12px', backgroundColor: '#8b0000', borderRadius: '50%', border: '2px solid #3e2723' }}></div>
+          <div style={{ position: 'absolute', bottom: '10px', left: '10px', width: '12px', height: '12px', backgroundColor: '#8b0000', borderRadius: '50%', border: '2px solid #3e2723' }}></div>
+          <div style={{ position: 'absolute', bottom: '10px', right: '10px', width: '12px', height: '12px', backgroundColor: '#8b0000', borderRadius: '50%', border: '2px solid #3e2723' }}></div>
 
-          <form onSubmit={handleUpdateAddress} style={{ display: 'flex', gap: '1rem', alignItems: 'center', flexWrap: 'wrap' }}>
-            <input value={deliveryAddress} onChange={e => setDeliveryAddress(e.target.value)} placeholder="Island Delivery Coordinates" style={{...inputStyle, flex: 1, minWidth: '200px'}} />
-            <button type="submit" style={{...btnStyle, width: 'auto', whiteSpace: 'nowrap', padding: '0.85rem 1.5rem'}}>Update Address</button>
-          </form>
+          <h2 style={{ fontSize: '3.5rem', margin: 0, color: '#3e2723', textTransform: 'uppercase', letterSpacing: '6px', borderBottom: '4px solid #3e2723', paddingBottom: '0.5rem', lineHeight: '1' }}>WANTED</h2>
+          <h3 style={{ fontSize: '1.8rem', color: '#8b0000', margin: '0.75rem 0 1.5rem 0', letterSpacing: '3px' }}>DEAD OR ALIVE</h3>
+          
+          <div style={{ 
+            backgroundColor: '#fdf6e3', 
+            border: '4px solid #3e2723', 
+            padding: '2rem 1rem', 
+            margin: '0 auto 1.5rem auto',
+            width: '80%',
+            boxShadow: 'inset 0 0 20px rgba(0,0,0,0.1)' 
+          }}>
+            <h1 style={{ fontSize: '2.5rem', color: '#3e2723', margin: '0', textTransform: 'uppercase', wordWrap: 'break-word' }}>
+              {profile.name}
+            </h1>
+          </div>
+
+          <p style={{ fontSize: '1.3rem', color: '#555', fontWeight: 'bold', marginBottom: '2rem', borderBottom: '2px dashed #a67b5b', paddingBottom: '1.5rem' }}>
+            📍 Known Hideout: <br/>
+            <span style={{ color: '#8b0000', fontSize: '1.5rem' }}>{profile.delivery_address || 'Unknown Waters'}</span>
+          </p>
+
+          <div style={{ backgroundColor: 'rgba(255,255,255,0.5)', padding: '1.5rem', border: '2px dashed #a67b5b', borderRadius: '8px' }}>
+            <h4 style={{ color: '#3e2723', marginTop: 0, marginBottom: '1rem', fontSize: '1.2rem', textTransform: 'uppercase' }}>✍️ Update Bounty Info</h4>
+            
+            <form onSubmit={handleUpdateName} style={{ display: 'flex', gap: '1rem', marginBottom: '1rem', alignItems: 'center', flexWrap: 'wrap' }}>
+              <input value={name} onChange={e => setName(e.target.value)} placeholder="New Pirate Name" required style={{...inputStyle, flex: 1, minWidth: '200px'}} />
+              <button type="submit" style={{...btnStyle, width: 'auto', whiteSpace: 'nowrap', padding: '0.85rem 1.5rem'}}>Change Name</button>
+            </form>
+
+            <form onSubmit={handleUpdateAddress} style={{ display: 'flex', gap: '1rem', alignItems: 'center', flexWrap: 'wrap' }}>
+              <input value={deliveryAddress} onChange={e => setDeliveryAddress(e.target.value)} placeholder="New Delivery Coordinates" style={{...inputStyle, flex: 1, minWidth: '200px'}} />
+              <button type="submit" style={{...btnStyle, width: 'auto', whiteSpace: 'nowrap', padding: '0.85rem 1.5rem'}}>Change Hideout</button>
+            </form>
+          </div>
         </div>
 
         <div style={{ display: 'flex', gap: '2rem', justifyContent: 'center' }}>
@@ -212,6 +246,7 @@ export default function CustomerApp() {
     );
   }
 
+  // LOGIN / REGISTER VIEW
   return (
     <div style={{ maxWidth: '420px', margin: '0 auto', textAlign: 'center', padding: '1rem 0' }}>
       <h3 style={{ color: '#8b0000', borderBottom: '2px dashed #a67b5b', paddingBottom: '0.75rem', marginBottom: '2rem', fontSize: '1.8rem', textTransform: 'uppercase', letterSpacing: '1px' }}>
