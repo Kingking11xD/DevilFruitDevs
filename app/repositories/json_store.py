@@ -1,16 +1,33 @@
 import json
 import os
-from collections.abc import Callable
+from contextlib import contextmanager
+from collections.abc import Callable, Iterator, Mapping
 from pathlib import Path
 from tempfile import NamedTemporaryFile
-from threading import Lock
+from threading import Lock, get_ident
 from typing import Any
 
 PROJECT_ROOT = Path(__file__).resolve().parents[2]
 
 _storage_lock = Lock() # All JSON reads and updates take turns using this lock
+_lock_owner: int | None = None
 
-
+@contextmanager
+def _locked() -> Iterator[None]:
+    """Hold the storage lock, failing fast instead of deadlocking on nested use."""
+    global _lock_owner
+    if _lock_owner == get_ident():
+        raise RuntimeError(
+            "Storage lock is already held; don't call storage helpers or "
+            "repository methods inside a change function"
+        )
+    with _storage_lock:
+        _lock_owner = get_ident()
+        try:
+            yield
+        finally:
+            _lock_owner = None
+            
 def data_path(filename: str) -> Path:
     folder = Path(os.environ.get("DATA_DIR", "data"))
     if not folder.is_absolute():
@@ -78,14 +95,14 @@ def _save(
 
 def read_records(path: str | Path) -> list[dict]:
     path = Path(path).resolve()
-    with _storage_lock:
+    with _locked():
         return _read(path)
 
 def read_shopping(path: str | Path) -> dict[str, list[dict]]:
     """Safely read and return the shopping cart and order data."""
     path = Path(path).resolve()
 
-    with _storage_lock:
+    with _locked():
         return _read_shopping(path)
 
 def update_records(
@@ -95,7 +112,7 @@ def update_records(
     """Run a repository's change function and save before returning its result."""
     path = Path(path).resolve()
 
-    with _storage_lock:
+    with _locked():
         records = _read(path)
         result = change(records) # The repository changes this list while the storage lock is held
         _save(path, records)
@@ -108,8 +125,26 @@ def update_shopping(
     """Safely update and save shopping cart and order data."""
     path = Path(path).resolve()
 
-    with _storage_lock:
+    with _locked():
         shopping = _read_shopping(path)
         result = change(shopping)
         _save(path, shopping)
         return result
+
+
+def run_checkout_transaction(
+        shopping_path: str | Path,
+        reference_paths: Mapping[str, str | Path],
+        change: Callable[[dict[str, list[dict]], dict[str, list[dict]]], Any],
+) -> Any:
+    """Read related data, run a checkout change and save shopping data atomically."""
+    shopping_path = Path(shopping_path).resolve()
+    resolved_paths = {name: Path(path).resolve() for name, path in reference_paths.items()}
+ 
+    with _locked():
+        references = {name: _read(path) for name, path in resolved_paths.items()}
+        shopping = _read_shopping(shopping_path)
+        result = change(shopping, references)
+        _save(shopping_path, shopping)  # Order and closed cart are written in one replacement
+        return result
+ 
