@@ -19,7 +19,7 @@ def get_order_service() -> OrderService:
 
 
 @router.get(
-    "/customers/me/orders",
+    "/orders",
     response_model=list[Order],
     summary="View my order history",
     description="Return the signed-in customer's orders, newest first. "
@@ -36,7 +36,7 @@ def list_my_orders(
 
 
 @router.get(
-    "/customers/me/orders/{order_id}",
+    "/orders/{order_id}",
     response_model=Order,
     summary="View one of my orders",
     description="Return one of the signed-in customer's orders with the item, price "
