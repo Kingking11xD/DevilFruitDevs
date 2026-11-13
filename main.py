@@ -9,7 +9,7 @@ from app.api.routes.health import router as health_router
 from app.api.routes.menu import router as menu_router
 from app.api.routes.restaurants import router as restaurants_router
 from app.api.routes.carts import router as carts_router
-
+from app.api.routes.orders import router as orders_router
 app = FastAPI()
 
 
@@ -42,3 +42,4 @@ app.include_router(menu_router)
 app.include_router(customers_router)
 app.include_router(auth_router)
 app.include_router(carts_router)
+app.include_router(orders_router)
