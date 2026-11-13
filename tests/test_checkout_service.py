@@ -3,10 +3,11 @@ from pathlib import Path
 
 import pytest
 from app.services.checkout_service import (
-    CheckoutService, InactiveCustomerError, MissingAddressError, NoActiveCartError,
+    CheckoutService, InactiveCustomerError, MissingAddressError, CartNotFoundError,
     TotalChangedError, UnavailableItemError)
 
 NOW = "2026-11-15T18:00:00Z"
+CART_ID = 5
 CART_TOTAL = 2900
 
 def write_json(path: Path, data) -> None:
@@ -75,7 +76,7 @@ def update_file(path: Path, change) -> None:
 
 def test_checkout_creates_order_and_closes_cart(files: dict[str, Path]) -> None:
     """Test that a valid cart becomes a saved order and the cart is closed."""
-    order = make_service(files).checkout(1, CART_TOTAL)
+    order, created = make_service(files).checkout(1, CART_ID, CART_TOTAL)
 
     assert order["id"] == 1
     assert order["source_cart_id"] == 5
@@ -100,14 +101,14 @@ def test_checkout_uses_current_menu_prices(files: dict[str, Path]) -> None:
     update_file(files["menu_items"], lambda items: items[0].update(price=1500))
     before = files["shopping"].read_bytes()
     with pytest.raises(TotalChangedError) as error:
-        make_service(files).checkout(1, CART_TOTAL)
+        make_service(files).checkout(1, CART_ID, CART_TOTAL)
     assert error.value.total == 3400 
     assert files["shopping"].read_bytes() == before
 
 
 def test_order_snapshot_survives_later_changes(files: dict[str, Path]) -> None:
     """Test that later menu and address changes don't rewrite a saved order."""
-    order = make_service(files).checkout(1, CART_TOTAL)
+    order, _ = make_service(files).checkout(1, CART_ID, CART_TOTAL)
     update_file(files["menu_items"], lambda items: items[0].update(price=9999, name="New Burger"))
     update_file(files["accounts"], lambda accounts: accounts[0].update(delivery_address="456 New Rd"))
 
@@ -131,7 +132,7 @@ def test_checkout_rejects_invalid_customer(files: dict[str, Path], change, error
     before = files["shopping"].read_bytes()
 
     with pytest.raises(error):
-        make_service(files).checkout(1,  CART_TOTAL)
+                make_service(files).checkout(1, CART_ID, CART_TOTAL)
 
     assert files["shopping"].read_bytes() == before
 
@@ -150,16 +151,53 @@ def test_checkout_rejects_unavailable_items(files: dict[str, Path], file_name: s
     before = files["shopping"].read_bytes()
 
     with pytest.raises(UnavailableItemError):
-        make_service(files).checkout(1, CART_TOTAL)
+        make_service(files).checkout(1, CART_ID, CART_TOTAL)
 
     assert files["shopping"].read_bytes() == before
 
 def test_checkout_only_uses_own_cart(files: dict[str, Path]) -> None:
-    """Test that one customer's checkout never uses another customer's cart."""
+    """Test that a customer can't check out another customer's cart."""
     update_file(files["accounts"], lambda accounts: accounts.append(
         {"id": 2, "name": "Ben", "role": "customer", "active": True, "delivery_address": "9 Elm St"}))
 
-    with pytest.raises(NoActiveCartError):
-        make_service(files).checkout(2, CART_TOTAL)
+    with pytest.raises(CartNotFoundError):
+        make_service(files).checkout(2, CART_ID, CART_TOTAL)
 
     assert read_json(files["shopping"])["carts"][0]["status"] == "active"
+
+
+def test_retry_returns_existing_order(files: dict[str, Path]) -> None:
+    """Test that checking out the same cart again returns the same order without a duplicate."""
+    service = make_service(files)
+    first, first_created = service.checkout(1, CART_ID, CART_TOTAL)
+
+    retry, retry_created = service.checkout(1, CART_ID, CART_TOTAL)
+
+    assert first_created is True
+    assert retry_created is False
+    assert retry == first
+    assert len(read_json(files["shopping"])["orders"]) == 1
+
+
+def test_retry_by_other_customer_is_rejected(files: dict[str, Path]) -> None:
+    """Test that another customer can't get an existing order by retrying its cart."""
+    make_service(files).checkout(1, CART_ID, CART_TOTAL)
+
+    with pytest.raises(CartNotFoundError):
+        make_service(files).checkout(2, CART_ID, CART_TOTAL)
+
+
+def test_new_cart_after_order_checks_out_normally(files: dict[str, Path]) -> None:
+    """Test that a customer's next cart becomes a new order after a previous one."""
+    service = make_service(files)
+    service.checkout(1, CART_ID, CART_TOTAL)
+    update_file(files["shopping"], lambda shopping: shopping["carts"].append({
+        "id": 6, "customer_id": 1, "restaurant_id": 1, "status": "active",
+        "items": [{"menu_item_id": 2, "quantity": 2}],
+    }))
+
+    order, created = service.checkout(1, 6, 800)
+
+    assert created is True
+    assert order["id"] == 2
+    assert order["source_cart_id"] == 6

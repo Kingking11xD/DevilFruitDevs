@@ -12,7 +12,7 @@ from app.services.checkout_service import CheckoutService
 
 CUSTOMER = {"id": 1, "name": "Ana Lopez", "role": "customer", "active": True}
 CONFIRMED = {"expected_total": 2500}  # 2 x Burger (1250)
-
+CHECKOUT_URL = "/carts/5/checkout"
 
 def write_json(path: Path, data) -> None:
     """Write JSON test data to a file."""
@@ -73,7 +73,7 @@ def change_shopping(files: dict[str, Path], change) -> None:
 
 def test_checkout_success(client: TestClient, files: dict[str, Path]) -> None:
     """Test that checkout returns 201 with the created order."""
-    response = client.post("/customers/me/checkout", json=CONFIRMED)
+    response = client.post(CHECKOUT_URL, json=CONFIRMED)
 
     assert response.status_code == 201
     body = response.json()
@@ -82,21 +82,37 @@ def test_checkout_success(client: TestClient, files: dict[str, Path]) -> None:
     assert body["total"] == 2500
 
 
-def test_checkout_no_active_cart(client: TestClient, files: dict[str, Path]) -> None:
-    """Test that checking out twice returns 404 the second time because the cart is closed."""
-    client.post("/customers/me/checkout", json=CONFIRMED)
+def test_checkout_retry_returns_existing_order(client: TestClient, files: dict[str, Path]) -> None:
+    """Test that checking out the same cart again returns 200 with the same order and no duplicate."""
+    first = client.post(CHECKOUT_URL, json=CONFIRMED)
 
-    response = client.post("/customers/me/checkout", json=CONFIRMED)
+    retry = client.post(CHECKOUT_URL, json=CONFIRMED)
+
+    assert first.status_code == 201
+    assert retry.status_code == 200
+    assert retry.json() == first.json()
+    shopping = json.loads(files["shopping"].read_text(encoding="utf-8"))
+    assert len(shopping["orders"]) == 1
+
+
+@pytest.mark.parametrize("url", ["/carts/999/checkout", "/carts/6/checkout"])
+def test_checkout_cart_not_found(client: TestClient, files: dict[str, Path], url: str) -> None:
+    """Test that a missing cart or another customer's cart returns 404."""
+    change_shopping(files, lambda shopping: shopping["carts"].append({
+        "id": 6, "customer_id": 2, "restaurant_id": 1, "status": "active",
+        "items": [{"menu_item_id": 1, "quantity": 1}],
+    }))
+
+    response = client.post(url, json=CONFIRMED)
 
     assert response.status_code == 404
-    assert response.json()["detail"] == "No active cart"
-
+    assert response.json()["detail"] == "Cart not found"
 
 def test_checkout_empty_cart(client: TestClient, files: dict[str, Path]) -> None:
     """Test that an empty cart returns 400."""
     change_shopping(files, lambda shopping: shopping["carts"][0].update(items=[]))
 
-    response = client.post("/customers/me/checkout", json=CONFIRMED)
+    response = client.post(CHECKOUT_URL, json=CONFIRMED)
 
     assert response.status_code == 400
     assert response.json()["detail"] == "Cart is empty"
@@ -108,14 +124,14 @@ def test_checkout_unavailable_item(client: TestClient, files: dict[str, Path]) -
         {"id": 1, "restaurant_id": 1, "name": "Burger", "price": 1250, "available": False},
     ])
 
-    response = client.post("/customers/me/checkout", json=CONFIRMED)
+    response = client.post(CHECKOUT_URL, json=CONFIRMED)
 
     assert response.status_code == 409
 
 
 def test_checkout_requires_authentication(app: FastAPI) -> None:
     """Test that checkout without a token returns 401."""
-    response = TestClient(app).post("/customers/me/checkout", json=CONFIRMED)
+    response = TestClient(app).post(CHECKOUT_URL, json=CONFIRMED)
 
     assert response.status_code == 401
 
@@ -126,7 +142,7 @@ def test_checkout_total_changed(client: TestClient, files: dict[str, Path]) -> N
         {"id": 1, "restaurant_id": 1, "name": "Burger", "price": 1500, "available": True},
     ])
 
-    response = client.post("/customers/me/checkout", json=CONFIRMED)
+    response = client.post(CHECKOUT_URL, json=CONFIRMED)
 
     assert response.status_code == 409
     assert response.json()["detail"] == {"message": "Order total has changed", "total": 3000}
@@ -135,7 +151,7 @@ def test_checkout_total_changed(client: TestClient, files: dict[str, Path]) -> N
     assert shopping["carts"][0]["status"] == "active"
 
     new_total = response.json()["detail"]["total"]
-    retry = client.post("/customers/me/checkout", json={"expected_total": new_total})
+    retry = client.post(CHECKOUT_URL, json={"expected_total": new_total})
 
     assert retry.status_code == 201
     assert retry.json()["total"] == 3000

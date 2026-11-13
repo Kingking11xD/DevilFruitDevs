@@ -20,8 +20,12 @@ class MissingAddressError(CheckoutError):
     """The customer has no delivery address."""
 
 
-class NoActiveCartError(CheckoutError):
-    """The customer has no active cart."""
+class CartNotFoundError(CheckoutError):
+    """The cart doesn't exist or belongs to another customer."""
+
+
+class CartClosedError(CheckoutError):
+    """The cart is no longer active and has no order to return."""
 
 
 class EmptyCartError(CheckoutError):
@@ -69,7 +73,7 @@ class CheckoutService:
         }
         self.clock = clock
 
-    def checkout(self, customer_id: int, expected_total: int) -> dict[str, Any]:
+    def checkout(self, customer_id: int, cart_id: int, expected_total: int) -> dict[str, Any]:
         """Validate the customer's active cart, save it as an order and close the cart.
 
         Everything runs while the shared storage lock is held, so prices,
@@ -78,20 +82,26 @@ class CheckoutService:
         nothing is saved and the cart stays active.
         """
 
-        def place_order(shopping: dict[str, list[dict]], references: dict[str, list[dict]]) -> dict[str, Any]:
+        def place_order(
+                shopping: dict[str, list[dict]],
+                references: dict[str, list[dict]]) -> tuple[dict[str, Any], bool]:
+            cart = _find(shopping["carts"], cart_id)
+            if cart is None or cart["customer_id"] != customer_id:
+                raise CartNotFoundError(cart_id)  # Same error either way, so other carts stay private
+
+            if cart["status"] != "active":
+                existing = next(
+                    (order for order in shopping["orders"] if order["source_cart_id"] == cart_id), None)
+                if existing is not None:
+                    return existing, False  # Retry: return the order already placed, create nothing
+                raise CartClosedError(cart_id)
+
             customer = _find(references["accounts"], customer_id)
             if customer is None or not customer.get("active", False):
                 raise InactiveCustomerError(customer_id)
             if not customer.get("delivery_address"):
                 raise MissingAddressError(customer_id)
 
-            cart = next(
-                (cart for cart in shopping["carts"]
-                 if cart["customer_id"] == customer_id and cart["status"] == "active"),
-                None,
-            )
-            if cart is None:
-                raise NoActiveCartError(customer_id)
             if not cart["items"]:
                 raise EmptyCartError(cart["id"])
 
@@ -130,6 +140,6 @@ class CheckoutService:
 
             shopping["orders"].append(order)
             cart["status"] = "closed"  # Saved in the same write as the order
-            return order
+            return order, True
 
         return run_checkout_transaction(self.shopping_path, self.reference_paths, place_order)
