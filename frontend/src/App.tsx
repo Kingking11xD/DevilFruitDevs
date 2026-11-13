@@ -13,6 +13,10 @@ export default function App() {
   const [refresh, setRefresh] = useState(0);
   const [isAdmin, setIsAdmin] = useState(false);
   const [activeTab, setActiveTab] = useState<'restaurants' | 'profile'>('restaurants');
+  
+  // Keep authentication token in memory above the tabs so it survives tab navigation
+  // while requiring sign-in after a full page reload (per m2-design.md)
+  const [token, setToken] = useState<string | null>(null);
 
   const [newRestaurant, setNewRestaurant] = useState<RestaurantCreate>({
     name: "",
@@ -151,7 +155,7 @@ export default function App() {
                <h2 style={{ color: "#3e2723", borderBottom: "2px solid #a67b5b", paddingBottom: "0.75rem", marginTop: 0, display: "flex", alignItems: "center", justifyContent: "center", gap: "10px" }}>
                  ⚓ Captain's Log (Profile)
                </h2>
-               <CustomerApp />
+               <CustomerApp token={token} setToken={setToken} />
             </section>
           )}
 

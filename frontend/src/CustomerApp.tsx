@@ -8,11 +8,66 @@ interface Account {
   is_active: boolean;
 }
 
-export default function CustomerApp() {
-  const [token, setToken] = useState<string | null>(localStorage.getItem('accessToken'));
+export interface CustomerAppProps {
+  token?: string | null;
+  setToken?: (token: string | null) => void;
+}
+
+// Module-level fallback so the token survives tab navigation without using localStorage
+let inMemoryToken: string | null = null;
+
+// Helper to convert FastAPI string or array validation errors into readable text
+function formatErrorDetail(detail: unknown, fallback: string): string {
+  if (typeof detail === 'string' && detail.trim().length > 0) {
+    return detail;
+  }
+  if (Array.isArray(detail)) {
+    const messages = detail
+      .map((item) => {
+        if (typeof item === 'string') return item;
+        if (item && typeof item === 'object' && 'msg' in item) {
+          const loc = Array.isArray((item as { loc?: unknown[] }).loc)
+            ? (item as { loc: unknown[] }).loc.filter((part) => part !== 'body').join('.')
+            : '';
+          const msg = String((item as { msg: unknown }).msg);
+          return loc ? `${loc}: ${msg}` : msg;
+        }
+        return JSON.stringify(item);
+      })
+      .filter(Boolean);
+    if (messages.length > 0) {
+      return messages.join('; ');
+    }
+  }
+  return fallback;
+}
+
+async function parseErrorMessage(res: Response, fallback: string): Promise<string> {
+  try {
+    const data = await res.json();
+    return formatErrorDetail(data?.detail, fallback);
+  } catch {
+    return fallback;
+  }
+}
+
+export default function CustomerApp(props: CustomerAppProps) {
+  const { token: propToken, setToken: propSetToken } = props;
+  const [localToken, setLocalToken] = useState<string | null>(inMemoryToken);
+
+  const token = propToken !== undefined ? propToken : localToken;
+  const updateToken = (newToken: string | null) => {
+    inMemoryToken = newToken;
+    if (propSetToken) {
+      propSetToken(newToken);
+    } else {
+      setLocalToken(newToken);
+    }
+  };
+
   const [profile, setProfile] = useState<Account | null>(null);
   const [view, setView] = useState<'login' | 'register'>('login');
-  const [message, setMessage] = useState<{ type: 'error' | 'success', text: string } | null>(null);
+  const [message, setMessage] = useState<{ type: 'error' | 'success'; text: string } | null>(null);
 
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
@@ -21,10 +76,8 @@ export default function CustomerApp() {
 
   useEffect(() => {
     if (token) {
-      localStorage.setItem('accessToken', token);
       fetchProfile();
     } else {
-      localStorage.removeItem('accessToken');
       setProfile(null);
     }
   }, [token]);
@@ -40,85 +93,120 @@ export default function CustomerApp() {
         setName(data.name);
         setDeliveryAddress(data.delivery_address || '');
       } else {
-        setToken(null);
+        const errMsg = await parseErrorMessage(res, 'Session expired. Please sign in again.');
+        updateToken(null);
+        setMessage({ type: 'error', text: errMsg });
       }
-    } catch (err) {
-      setMessage({ type: 'error', text: 'Network error loading profile.' });
+    } catch {
+      setMessage({ type: 'error', text: 'Network error loading profile. Please check if the server is running.' });
     }
   };
 
   const handleLogin = async (e: FormEvent) => {
     e.preventDefault();
     setMessage(null);
-    const res = await fetch('/auth/login', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ email, password })
-    });
-    
-    const data = await res.json();
-    if (res.ok) {
-      setToken(data.access_token);
-    } else {
-      setMessage({ type: 'error', text: data.detail || 'Login failed' });
+    try {
+      const res = await fetch('/auth/login', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email, password })
+      });
+
+      if (res.ok) {
+        const data = await res.json();
+        updateToken(data.access_token);
+      } else {
+        const errMsg = await parseErrorMessage(res, 'Login failed');
+        setMessage({ type: 'error', text: errMsg });
+      }
+    } catch {
+      setMessage({ type: 'error', text: 'Network error during login. Please try again.' });
     }
   };
 
   const handleRegister = async (e: FormEvent) => {
     e.preventDefault();
     setMessage(null);
-    const res = await fetch('/customers', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ name, email, password })
-    });
+    try {
+      const res = await fetch('/customers', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ name, email, password })
+      });
 
-    if (res.ok) {
-      setMessage({ type: 'success', text: 'Account created! Please log in.' });
-      setView('login');
-    } else {
-      const data = await res.json();
-      setMessage({ type: 'error', text: data.detail || 'Registration failed' });
+      if (res.ok) {
+        setMessage({ type: 'success', text: 'Account created! Please log in.' });
+        setView('login');
+      } else {
+        const errMsg = await parseErrorMessage(res, 'Registration failed');
+        setMessage({ type: 'error', text: errMsg });
+      }
+    } catch {
+      setMessage({ type: 'error', text: 'Network error during registration. Please try again.' });
     }
   };
 
   const handleUpdateName = async (e: FormEvent) => {
     e.preventDefault();
-    const res = await fetch('/customers/me', {
-      method: 'PATCH',
-      headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
-      body: JSON.stringify({ name })
-    });
-    if (res.ok) {
-      const updatedAccount = await res.json();
-      setProfile(updatedAccount);
-      setMessage({ type: 'success', text: 'Name updated successfully.' });
+    setMessage(null);
+    try {
+      const res = await fetch('/customers/me', {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+        body: JSON.stringify({ name })
+      });
+      if (res.ok) {
+        const updatedAccount = await res.json();
+        setProfile(updatedAccount);
+        setMessage({ type: 'success', text: 'Name updated successfully.' });
+      } else {
+        const errMsg = await parseErrorMessage(res, 'Failed to update name.');
+        setMessage({ type: 'error', text: errMsg });
+      }
+    } catch {
+      setMessage({ type: 'error', text: 'Network error while updating name.' });
     }
   };
 
   const handleUpdateAddress = async (e: FormEvent) => {
     e.preventDefault();
-    const res = await fetch('/customers/me/address', {
-      method: 'PATCH',
-      headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
-      body: JSON.stringify({ delivery_address: deliveryAddress })
-    });
-    if (res.ok) {
-      const updatedAccount = await res.json();
-      setProfile(updatedAccount);
-      setMessage({ type: 'success', text: 'Address updated successfully.' });
+    setMessage(null);
+    try {
+      const res = await fetch('/customers/me/address', {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+        body: JSON.stringify({ delivery_address: deliveryAddress })
+      });
+      if (res.ok) {
+        const updatedAccount = await res.json();
+        setProfile(updatedAccount);
+        setMessage({ type: 'success', text: 'Address updated successfully.' });
+      } else {
+        const errMsg = await parseErrorMessage(res, 'Failed to update address.');
+        setMessage({ type: 'error', text: errMsg });
+      }
+    } catch {
+      setMessage({ type: 'error', text: 'Network error while updating address.' });
     }
   };
 
   const handleDeactivate = async () => {
     if (!window.confirm('Are you sure you want to deactivate your account? This cannot be undone.')) return;
-    const res = await fetch('/customers/me/deactivate', {
-      method: 'POST',
-      headers: { Authorization: `Bearer ${token}` }
-    });
-    if (res.ok) {
-      setToken(null);
-      setMessage({ type: 'success', text: 'Account successfully deactivated.' });
+    setMessage(null);
+    try {
+      const res = await fetch('/customers/me/deactivate', {
+        method: 'POST',
+        headers: { Authorization: `Bearer ${token}` }
+      });
+      if (res.ok) {
+        updateToken(null);
+        setMessage({ type: 'success', text: 'Account successfully deactivated.' });
+      } else {
+        const errMsg = await parseErrorMessage(res, 'Failed to deactivate account.');
+        setMessage({ type: 'error', text: errMsg });
+      }
+    } catch {
+      setMessage({ type: 'error', text: 'Network error while deactivating account.' });
     }
   };
 
@@ -239,7 +327,7 @@ export default function CustomerApp() {
         </div>
 
         <div style={{ display: 'flex', gap: '2rem', justifyContent: 'center' }}>
-          <button onClick={() => setToken(null)} style={{...btnStyle, backgroundColor: '#8b0000', color: '#fff', width: 'auto', padding: '0.85rem 2rem'}}>Drop Anchor (Log Out)</button>
+          <button onClick={() => updateToken(null)} style={{...btnStyle, backgroundColor: '#8b0000', color: '#fff', width: 'auto', padding: '0.85rem 2rem'}}>Drop Anchor (Log Out)</button>
           <button onClick={handleDeactivate} style={{...linkBtnStyle, color: '#c62828'}}>Scuttle Ship (Deactivate)</button>
         </div>
       </div>
