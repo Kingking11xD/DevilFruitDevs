@@ -9,6 +9,8 @@ from app.api import dependencies
 from app.api.routes import carts
 from app.services import token_service
 from app.repositories.cart_repo import CartRepo
+from app.repositories.json_store import update_records
+from app.repositories import json_store
 
 @pytest.fixture
 def client(tmp_path, monkeypatch):
@@ -1346,4 +1348,353 @@ def test_remove_cart_item_invalid_id(client, item_id):
     response = client.delete(f"/customers/me/cart/items/{item_id}")
 
     assert response.status_code == 422
+    assert cart_file.read_text() == original_data
+
+
+def test_clear_cart_removes_items_and_resets_totals(client):
+    """Test that clearing a cart removes its items and resets totals."""
+    created = client.post("/customers/me/cart")
+    assert created.status_code == 201
+
+    added = client.post(
+        "/customers/me/cart/items",
+        json={"menu_item_id": 1, "quantity": 2},
+    )
+    assert added.status_code == 200
+
+    response = client.delete("/customers/me/cart/items")
+
+    assert response.status_code == 204
+    assert response.content == b""
+
+    cart = client.get("/customers/me/cart")
+    assert cart.status_code == 200
+
+    data = cart.json()
+    assert data["items"] == []
+    assert data["restaurant_id"] is None
+    assert data["status"] == "active"
+    assert data["subtotal"] == 0
+    assert data["total"] == 0
+    assert data["problems"] == []
+
+
+def test_clear_already_empty_cart(client):
+    """Test that clearing an already empty cart succeeds."""
+    created = client.post("/customers/me/cart")
+    assert created.status_code == 201
+
+    first_clear = client.delete("/customers/me/cart/items")
+    assert first_clear.status_code == 204
+
+    second_clear = client.delete("/customers/me/cart/items")
+    assert second_clear.status_code == 204
+    assert second_clear.content == b""
+
+    cart = client.get("/customers/me/cart")
+    assert cart.status_code == 200
+    assert cart.json()["items"] == []
+    assert cart.json()["restaurant_id"] is None
+    assert cart.json()["subtotal"] == 0
+    assert cart.json()["total"] == 0
+
+
+def test_clear_cart_no_active_cart(client):
+    """Test that clearing a missing cart returns 404."""
+    response = client.delete("/customers/me/cart/items")
+
+    assert response.status_code == 404
+    assert response.json()["detail"] == "Active cart not found"
+
+
+def test_clear_cart_requires_authentication(client):
+    """Test that an unauthenticated user can't clear a cart."""
+    created = client.post("/customers/me/cart")
+    assert created.status_code == 201
+
+    added = client.post(
+        "/customers/me/cart/items",
+        json={"menu_item_id": 1, "quantity": 2},
+    )
+    assert added.status_code == 200
+
+    original_cart = carts.repository.get_by_id(created.json()["id"])
+
+    client.headers.pop("Authorization")
+
+    response = client.delete("/customers/me/cart/items")
+
+    assert response.status_code == 401
+    assert response.json()["detail"] == "Authentication required"
+
+    saved_cart = carts.repository.get_by_id(created.json()["id"])
+    assert saved_cart == original_cart
+
+
+def test_clear_cart_deactivated_customer(client):
+    """Test that an inactive customer can't clear their cart."""
+    created = client.post("/customers/me/cart")
+    assert created.status_code == 201
+
+    added = client.post(
+        "/customers/me/cart/items",
+        json={"menu_item_id": 1, "quantity": 2},
+    )
+    assert added.status_code == 200
+
+    cart_file = carts.repository.file_path
+    original_data = cart_file.read_text()
+
+    deactivated = client.post("/customers/me/deactivate")
+    assert deactivated.status_code == 200
+
+    response = client.delete("/customers/me/cart/items")
+
+    assert response.status_code == 403
+    assert response.json()["detail"] == "Account is inactive"
+    assert cart_file.read_text() == original_data
+
+
+def test_customer_cannot_clear_another_cart(client):
+    """Test that customers can't clear another customer's cart."""
+    first_cart = client.post("/customers/me/cart")
+    assert first_cart.status_code == 201
+
+    added = client.post(
+        "/customers/me/cart/items",
+        json={"menu_item_id": 1, "quantity": 2},
+    )
+    assert added.status_code == 200
+
+    cart_file = carts.repository.file_path
+    original_data = cart_file.read_text()
+
+    registration = client.post(
+        "/customers",
+        json={
+            "name": "Customer",
+            "email": "cust@example.com",
+            "password": "Password123!",
+        },
+    )
+    assert registration.status_code == 201
+
+    login = client.post(
+        "/auth/login",
+        json={
+            "email": "cust@example.com",
+            "password": "Password123!",
+        },
+    )
+    assert login.status_code == 200
+
+    client.headers["Authorization"] = (
+        f"Bearer {login.json()['access_token']}"
+    )
+
+    response = client.delete("/customers/me/cart/items")
+
+    assert response.status_code == 404
+    assert response.json() == {"detail": "Active cart not found"}
+    assert cart_file.read_text() == original_data
+
+
+def test_clear_cart_persists_empty_cart(client):
+    """Test that clearing a cart persists the changes to storage."""
+    created = client.post("/customers/me/cart")
+    assert created.status_code == 201
+
+    added = client.post(
+        "/customers/me/cart/items",
+        json={"menu_item_id": 1, "quantity": 2},
+    )
+    assert added.status_code == 200
+
+    response = client.delete("/customers/me/cart/items")
+    assert response.status_code == 204
+
+    cart_file = carts.repository.file_path
+    shopping = json.loads(cart_file.read_text())
+
+    saved_cart = next(
+        cart for cart in shopping["carts"]
+        if cart["id"] == created.json()["id"]
+    )
+
+    assert saved_cart["items"] == []
+    assert saved_cart["restaurant_id"] is None
+    assert saved_cart["status"] == "active"
+
+
+def test_clear_cart_invalid_saved_data_unchanged(client):
+    """Test that clearing invalid saved cart data returns 500."""
+    created = client.post("/customers/me/cart")
+    assert created.status_code == 201
+
+    added = client.post(
+        "/customers/me/cart/items",
+        json={"menu_item_id": 1, "quantity": 2},
+    )
+    assert added.status_code == 200
+
+    cart_file = carts.repository.file_path
+    shopping = json.loads(cart_file.read_text())
+
+    saved_cart = next(
+        cart for cart in shopping["carts"]
+        if cart["id"] == created.json()["id"]
+    )
+    saved_cart["items"][0]["quantity"] = 0
+    cart_file.write_text(json.dumps(shopping))
+
+    original_data = cart_file.read_text()
+
+    response = client.delete("/customers/me/cart/items")
+
+    assert response.status_code == 500
+    assert response.json()["detail"] == "Cart storage is unavailable"
+    assert cart_file.read_text() == original_data
+
+
+def test_clear_cart_storage_error(client, monkeypatch):
+    """Test that a storage failure leaves the cart unchanged."""
+    created = client.post("/customers/me/cart")
+    assert created.status_code == 201
+
+    added = client.post(
+        "/customers/me/cart/items",
+        json={"menu_item_id": 1, "quantity": 2},
+    )
+    assert added.status_code == 200
+
+    cart_file = carts.repository.file_path
+    original_data = cart_file.read_text()
+
+    def fail_modify(cart_id, change):
+        """Simulate a repository storage failure."""
+        raise OSError("Storage failure")
+
+    monkeypatch.setattr(carts.repository, "modify", fail_modify)
+
+    response = client.delete("/customers/me/cart/items")
+
+    assert response.status_code == 500
+    assert response.json()["detail"] == "Cart storage is unavailable"
+    assert cart_file.read_text() == original_data
+
+
+def test_clear_cart_preserves_other_carts_and_orders(client):
+    """Test that clearing a cart preserves unrelated saved data."""
+    created = client.post("/customers/me/cart")
+    assert created.status_code == 201
+
+    added = client.post(
+        "/customers/me/cart/items",
+        json={"menu_item_id": 1, "quantity": 2},
+    )
+    assert added.status_code == 200
+
+    cart_file = carts.repository.file_path
+    shopping = json.loads(cart_file.read_text())
+
+    original_cart = shopping["carts"][0]
+
+    other_cart = {
+        "id": original_cart["id"] + 1000,
+        "customer_id": original_cart["customer_id"] + 1000,
+        "restaurant_id": original_cart["restaurant_id"],
+        "status": "active",
+        "items": [item.copy() for item in original_cart["items"]]
+    }
+
+    shopping["carts"].append(other_cart)
+    shopping["orders"].append({"id": 999, "marker": "unchanged"})
+    cart_file.write_text(json.dumps(shopping))
+
+    response = client.delete("/customers/me/cart/items")
+    assert response.status_code == 204
+
+    saved = json.loads(cart_file.read_text())
+
+    assert saved["carts"][0]["items"] == []
+    assert saved["carts"][0]["restaurant_id"] is None
+    assert saved["carts"][1] == other_cart
+    assert saved["orders"] == shopping["orders"]
+
+
+def test_clear_cart_invalid_authentication(client):
+    """Test that an invalid token can't clear a cart."""
+    created = client.post("/customers/me/cart")
+    assert created.status_code == 201
+
+    added = client.post(
+        "/customers/me/cart/items",
+        json={"menu_item_id": 1, "quantity": 2},
+    )
+    assert added.status_code == 200
+
+    cart_file = carts.repository.file_path
+    original_data = cart_file.read_text()
+
+    client.headers["Authorization"] = "Bearer invalid-token"
+
+    response = client.delete("/customers/me/cart/items")
+
+    assert response.status_code == 401
+    assert response.json()["detail"] == "Invalid authentication"
+    assert cart_file.read_text() == original_data
+
+
+@ pytest.mark.parametrize("role", ["admin", "restaurant_user"])
+def test_clear_cart_rejects_non_customer_role(client, role):
+    """Test that non customer accounts can't clear carts."""
+    created = client.post("/customers/me/cart")
+    assert created.status_code == 201
+
+    added = client.post(
+        "/customers/me/cart/items",
+        json={"menu_item_id": 1, "quantity": 2},
+    )
+    assert added.status_code == 200
+
+    cart_file = carts.repository.file_path
+    original_data = cart_file.read_text()
+
+    def change_role(records):
+        """Change the customer's role for testing."""
+        records[0]["role"] = role
+
+    update_records(dependencies.repository.file_path, change_role)
+
+    response = client.delete("/customers/me/cart/items")
+
+    assert response.status_code == 403
+    assert response.json()["detail"] == "Customer account required"
+    assert cart_file.read_text() == original_data
+
+
+def test_clear_cart_failed_save_unchanged(client, monkeypatch):
+    """Test that a failed save preserves the original cart."""
+    created = client.post("/customers/me/cart")
+    assert created.status_code == 201
+
+    added = client.post(
+        "/customers/me/cart/items",
+        json={"menu_item_id": 1, "quantity": 2},
+    )
+    assert added.status_code == 200
+
+    cart_file = carts.repository.file_path
+    original_data = cart_file.read_text()
+
+    def fail_replace(source, destination):
+        """Simulate a failure replacing the saved file."""
+        raise OSError("Simulated save failure")
+
+    monkeypatch.setattr(json_store.os, "replace", fail_replace)
+
+    response = client.delete("/customers/me/cart/items")
+
+    assert response.status_code == 500
+    assert response.json()["detail"] == "Cart storage is unavailable"
     assert cart_file.read_text() == original_data
