@@ -134,6 +134,46 @@ class CartService:
         return updated_cart
     
 
+    def remove_item(
+            self,
+            customer_id: int,
+            menu_item_id: int,
+    ) -> dict[str, Any]:
+        """Remove an existing item from the customer's active cart."""
+        cart = self.cart_repository.get_active_for_customer(customer_id)
+        if cart is None:
+            raise CartNotFoundError("Active cart not found")
+        
+        def change(current_cart: dict[str, Any]) -> None:
+            """Remove the item from the latest saved cart."""
+            if (
+                current_cart["status"] != "active"
+                or current_cart["customer_id"] != customer_id
+            ):
+                raise CartNotFoundError("Active cart not found")
+            
+            validated_cart = Cart.model_validate(current_cart)
+            item_ids = [item.menu_item_id for item in validated_cart.items]
+            if len(item_ids) != len(set(item_ids)):
+                raise ValueError("Duplicate cart items")
+            
+            for index, item in enumerate(current_cart["items"]):
+                if item["menu_item_id"] == menu_item_id:
+                    current_cart["items"].pop(index)
+
+                    if not current_cart["items"]:
+                        current_cart["restaurant_id"] = None
+                    return
+                
+            raise CartItemNotFoundError("Cart item not found")
+        
+        updated_cart = self.cart_repository.modify(cart["id"], change)
+        if updated_cart is None:
+            raise CartNotFoundError("Active cart not found")
+        
+        return updated_cart
+    
+
     def get_cart_details(self, customer_id: int) -> dict[str, Any]:
         """Get a customer's active cart with item details and totals."""
         cart = self.cart_repository.get_active_for_customer(customer_id)
