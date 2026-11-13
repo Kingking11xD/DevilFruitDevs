@@ -693,3 +693,144 @@ def test_get_cart_details_no_active_cart(cart_service):
     """Test that a missing active cart raises an error."""
     with pytest.raises(CartNotFoundError):
         cart_service.get_cart_details(customer_id=999)
+
+
+def test_clear_cart_removes_items_and_resets_totals(cart_service):
+    """Test that clearing a cart removes items and resets totals."""
+    cart_service.add_item(
+        customer_id=1,
+        menu_item_id=1,
+        quantity=2,
+    )
+
+    cleared_cart = cart_service.clear_cart(customer_id=1)
+
+    assert cleared_cart["items"] == []
+    assert cleared_cart["restaurant_id"] is None
+    assert cleared_cart["status"] == "active"
+
+    saved_cart = cart_service.cart_repository.get_active_for_customer(1)
+    assert saved_cart["items"] == []
+    assert saved_cart["restaurant_id"] is None
+
+    details = cart_service.get_cart_details(customer_id=1)
+    assert details["items"] == []
+    assert details["subtotal"] == 0
+    assert details["total"] == 0
+    assert details["problems"] == []
+
+
+def test_clear_already_empty_cart(cart_service):
+    """Test that clearing an already empty cart succeeds."""
+    cart_service.clear_cart(customer_id=1)
+    cleared_cart = cart_service.clear_cart(customer_id=1)
+
+    assert cleared_cart["items"] == []
+    assert cleared_cart["restaurant_id"] is None
+    assert cleared_cart["status"] == "active"
+
+    details = cart_service.get_cart_details(customer_id=1)
+    assert details["subtotal"] == 0
+    assert details["total"] == 0
+
+
+def test_clear_cart_no_active_cart(cart_service):
+    """Test that clearing a missing cart leaves existing data unchanged."""
+    original_cart = cart_service.cart_repository.get_active_for_customer(1)
+
+    with pytest.raises(CartNotFoundError):
+        cart_service.clear_cart(customer_id=99)
+
+    saved_cart = cart_service.cart_repository.get_active_for_customer(1)
+    assert saved_cart == original_cart
+
+
+def test_clear_cart_only_own_cart(cart_service):
+    """Test that a customer can't clear another customer's cart."""
+    cart_service.add_item(
+        customer_id=1,
+        menu_item_id=1,
+        quantity=2,
+    )
+
+    original_cart = cart_service.cart_repository.get_active_for_customer(1)
+
+    with pytest.raises(CartNotFoundError):
+        cart_service.clear_cart(customer_id=2)
+
+    saved_cart = cart_service.cart_repository.get_active_for_customer(1)
+    assert saved_cart == original_cart
+
+
+def test_clear_cart_invalid_saved_cart_unchanged(cart_service):
+    """Test that invalid saved cart data is not modified."""
+    cart_service.add_item(
+        customer_id=1,
+        menu_item_id=1,
+        quantity=2,
+    )
+
+    cart_file = cart_service.cart_repository.file_path
+    shopping = json.loads(cart_file.read_text())
+    shopping["carts"][0]["items"][0]["quantity"] = 0
+    cart_file.write_text(json.dumps(shopping))
+
+    original_data = cart_file.read_text()
+
+    with pytest.raises(ValidationError):
+        cart_service.clear_cart(customer_id=1)
+
+    assert cart_file.read_text() == original_data
+
+
+def test_clear_cart_duplicate_items_unchanged(cart_service):
+    """Test that duplicate cart items are not cleared."""
+    cart_service.add_item(
+        customer_id=1,
+        menu_item_id=1,
+        quantity=2,
+    )
+
+    cart_file = cart_service.cart_repository.file_path
+    shopping = json.loads(cart_file.read_text())
+    shopping["carts"][0]["items"].append(
+        {"menu_item_id": 1, "quantity": 3}
+    )
+    cart_file.write_text(json.dumps(shopping))
+
+    original_data = cart_file.read_text()
+
+    with pytest.raises(ValueError, match="Duplicate cart items"):
+        cart_service.clear_cart(customer_id=1)
+
+    assert cart_file.read_text() == original_data
+
+
+def test_clear_cart_closed_before_modify(cart_service, monkeypatch):
+    """Test that a cart closed before modification is not cleared."""
+    cart_service.add_item(
+        customer_id=1,
+        menu_item_id=1,
+        quantity=2,
+    )
+
+    repository = cart_service.cart_repository
+    original_cart = repository.get_active_for_customer(1)
+    original_modify = repository.modify
+
+    def closed_before_modify(cart_id, change):
+        """Simulate check out closing the cart before modification."""
+        repository.update(cart_id, {"status": "closed"})
+        return original_modify(cart_id, change)
+
+    monkeypatch.setattr(repository, "modify", closed_before_modify)
+
+    with pytest.raises(CartNotFoundError):
+        cart_service.clear_cart(customer_id=1)
+
+    shopping = json.loads(repository.file_path.read_text())
+    saved_cart = shopping["carts"][0]
+
+    assert saved_cart["status"] == "closed"
+    assert saved_cart["items"] == original_cart["items"]
+    assert saved_cart["restaurant_id"] == original_cart["restaurant_id"]
