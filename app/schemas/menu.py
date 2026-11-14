@@ -27,8 +27,14 @@ class MenuItemUpdate(BaseModel):
 
     name: str | None = Field(default=None, min_length=1, max_length=100)
     price: int | None = Field(default=None, gt=0)
-    available: StrictBool | None = None
-    active : StrictBool | None = None
+    available: StrictBool | None = Field(
+        default=None,
+        description="Whether the item is temporarily available.",
+    )
+    active : StrictBool | None = Field(
+        default=None,
+        description="Whether the item is active or deactivated.",
+    )
 
     @model_validator(mode="after")
     def check_changes(self) -> "MenuItemUpdate":

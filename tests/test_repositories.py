@@ -584,6 +584,10 @@ def test_menu_repo_update_status_persists(tmp_path: Path, changes):
 
     expected = {**items[0] , **changes}
 
+    assert updated == expected
+    assert MenuRepo(path).get_by_id(1) == expected
+    assert MenuRepo(path).get_by_id(2) == items[1]
+
 
 @pytest.mark.parametrize(
     "field, value",
