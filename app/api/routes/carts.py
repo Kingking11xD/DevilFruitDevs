@@ -239,3 +239,38 @@ def remove_cart_item(
             status_code=500,
             detail="Cart storage is unavailable",
         ) from error
+
+
+@router.delete(
+    "/customers/me/cart/items",
+    status_code=204,
+    summary="Clear my cart",
+    description=(
+        "Remove all items from the signed in customer's active cart "
+        "and reset its restaurant. Clearing an empty cart also succeeds."
+    ),
+    responses={
+        401: {"description": "Authentication required"},
+        403: {"description": "Customer account is inactive or unauthorized"},
+        404: {"description": "Active cart not found"},
+        500: {"description": "Cart storage is unavailable"},
+    },
+)
+def clear_cart(
+    account: Annotated[dict[str, Any], Depends(get_current_customer)],
+) -> None:
+    """Remove all items from the customer's active cart."""
+    try:
+        service.clear_cart(customer_id=account["id"])
+
+    except CartNotFoundError as error:
+        raise HTTPException(
+            status_code=404,
+            detail=str(error),
+        ) from error
+
+    except (OSError, ValueError, KeyError, TypeError) as error:
+        raise HTTPException(
+            status_code=500,
+            detail="Cart storage is unavailable",
+        ) from error
