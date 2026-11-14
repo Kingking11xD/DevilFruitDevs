@@ -392,7 +392,7 @@ def test_invalid_menu_restaurant_id(restaurant_id: str) -> None:
     response = client.get(f"/restaurants/{restaurant_id}/menu-items")
 
     assert response.status_code == 422
-    
+
 @pytest.fixture
 def menu_item_files(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> list[dict]:
     restaurant_data = [
@@ -419,7 +419,7 @@ def test_menu_item(menu_item_files) -> None:
     response = client.get("/restaurants/1/menu-items/1")
 
     assert response.status_code == 200
-    assert response.json() == menu_item_files[0]
+    assert response.json() == {**menu_item_files[0], "active": True}
 
 
 def test_menu_item_unavailable_is_returned(menu_item_files) -> None:
@@ -512,7 +512,11 @@ def test_update_menu_item(menu_item_files):
     response = client.patch("/restaurants/1/menu-items/1", json={"price": 1900})
 
     assert response.status_code == 200
-    assert response.json() == {**menu_item_files[0], "price": 1900}
+    assert response.json() == {
+        **menu_item_files[0],
+        "price": 1900,
+        "active": True,
+    }
     assert client.get("/restaurants/1/menu-items/1").json()["price"] == 1900
 
 

@@ -1,12 +1,13 @@
-from pydantic import BaseModel, ConfigDict, Field, model_validator
+from pydantic import BaseModel, ConfigDict, Field, StrictBool, model_validator
 
 
 class MenuItem(BaseModel):
     id: int
     restaurant_id: int
-    name: str
-    price: int
+    name: str = Field(min_length=1, max_length=100)
+    price: int = Field(gt=0, strict=True)
     available: bool
+    active: bool = True
 
 class MenuItemCreate(BaseModel):
     model_config = ConfigDict(
@@ -16,7 +17,7 @@ class MenuItemCreate(BaseModel):
 
     name: str = Field(min_length=1, max_length=100)
     price: int = Field(gt=0, description="Price in Berries")
-    available: bool = True
+    available: StrictBool = True
 
 class MenuItemUpdate(BaseModel):
     model_config = ConfigDict(
@@ -26,7 +27,8 @@ class MenuItemUpdate(BaseModel):
 
     name: str | None = Field(default=None, min_length=1, max_length=100)
     price: int | None = Field(default=None, gt=0)
-    available: bool | None = None
+    available: StrictBool | None = None
+    active : StrictBool | None = None
 
     @model_validator(mode="after")
     def check_changes(self) -> "MenuItemUpdate":

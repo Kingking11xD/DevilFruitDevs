@@ -136,6 +136,9 @@ def test_menu_repo_create_assigns_next_id(tmp_path):
     assert first["id"] == 1
     assert second["id"] == 2
     assert len(repo.get_all()) == 2
+    assert first["active"] is True
+    assert second["active"] is True
+    assert repo.get_by_id(1)["active"] is True
 
 def test_menu_repo_update(tmp_path):
     path = tmp_path / "menu_items.json"
@@ -148,6 +151,30 @@ def test_menu_repo_update(tmp_path):
     assert updated["name"] == "A"
     assert repo.get_by_id(1)["price"] == 250
     assert repo.update(99, {"price": 1}) is None
+
+
+def test_menu_repo_update_invalid_saved_data(tmp_path: Path) -> None:
+    """Test that invalid saved menu data is not modified."""
+    path = tmp_path / "menu_items.json"
+    data = [
+        {
+            "id": 1,
+            "restaurant_id": 1,
+            "name": "Pizza",
+            "price": 100,
+            "available": "yes",
+        }
+    ]
+    path.write_text(json.dumps(data), encoding="utf-8")
+    before = path.read_bytes()
+
+    repo = MenuRepo(path)
+
+    with pytest.raises(ValueError):
+        repo.update(1, {"active": False})
+
+    assert path.read_bytes() == before
+
 
 def test_save_records(tmp_path: Path) -> None:
     path = tmp_path / "restaurants.json"
@@ -520,3 +547,72 @@ def test_cart_repo_concurrent_modify(tmp_path: Path) -> None:
     assert sorted(
         item["menu_item_id"] for item in saved_cart["items"]
     ) == [5, 10]
+
+
+@pytest.mark.parametrize(
+    "changes",
+    [
+        {"available": False},
+        {"active": False},
+    ],
+)
+def test_menu_repo_update_status_persists(tmp_path: Path, changes):
+    """Test that stauts changes are saved without modifying other items."""
+    path = tmp_path / "menu_items.json"
+    items = [
+        {
+            "id": 1,
+            "restaurant_id": 1,
+            "name": "Pizza",
+            "price": 100,
+            "available": True,
+            "active": True,
+        },
+        {
+            "id": 2,
+            "restaurant_id": 1,
+            "name": "Burger",
+            "price": 200,
+            "available": True,
+            "active": True,
+        },
+    ]
+    path.write_text(json.dumps(items), encoding="utf-8")
+
+    repo = MenuRepo(path)
+    updated = repo.update(1, changes)
+
+    expected = {**items[0] , **changes}
+
+
+@pytest.mark.parametrize(
+    "field, value",
+    [
+        ("price", -10),
+        ("price", True),
+        ("name", ""),
+    ],
+)
+def test_menu_repo_update_invalid_saved_fields(
+    tmp_path: Path, field, value
+) -> None:
+    """Test that invalid saved fields prevent menu updates."""
+    path = tmp_path / "menu_item.json"
+    item = {
+        "id": 1,
+        "restaurant_id": 1,
+        "name": "Pizza",
+        "price": 100,
+        "available": True,
+        "active": True,
+    }
+    item[field] = value
+    path.write_text(json.dumps([item]), encoding="utf-8")
+    before = path.read_bytes()
+
+    repo = MenuRepo(path)
+
+    with pytest.raises(ValueError):
+        repo.update(1, {"available": False})
+
+    assert path.read_bytes() == before
