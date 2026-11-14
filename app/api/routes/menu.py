@@ -1,12 +1,13 @@
 from typing import Annotated, Any
 
-from fastapi import APIRouter, HTTPException, Path, status
+from fastapi import APIRouter, Depends, HTTPException, Path, status
 
 from app.api.routes.restaurants import repository as restaurant_repository
 from app.repositories.menu_repo import MenuRepo
 from app.schemas.menu import MenuItem, MenuItemCreate, MenuItemUpdate
 from app.services.menu_service import MenuItemNotFoundError, MenuService
 from app.services.restaurant_service import RestaurantNotFoundError
+from app.api.dependencies import get_restaurant_manager
 
 router = APIRouter()
 
@@ -107,15 +108,20 @@ def add_menu_item(
     response_model=MenuItem,
     summary="Update menu item",
     description=(
-        "Update fields and return the saved menu item. "
-        "Missing fields stay unchanged. "
-        "Empty updates and null values are rejected."
+        "Update a menu item. Only admins or assigned restaurant users "
+        "can make changes. 'available' controls temporary availability, "
+        "while 'active' controls deactivation. "
+        "Unavailable or inactive items can't be added to carts. "
+        "Missing fields stay unchanged, empty updates and nulls are rejected."
     ),
     responses={
+        401: {"description": "Authentication required or invalid"},
+        403: {"description": "Inactive account or insufficient permissions"},
         404: {"description": "Restaurant or menu item not found"},
         422: {"description": "Invalid menu item information"},
         500: {"description": "Menu item data could not be saved"},
     },
+    dependencies=[Depends(get_restaurant_manager)],
 )
 def update_menu_item(
     restaurant_id: Annotated[int, Path(gt=0)],

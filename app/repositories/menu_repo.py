@@ -2,6 +2,7 @@ from pathlib import Path
 from typing import Any
 
 from app.repositories.json_store import data_path, read_records, update_records
+from app.schemas.menu import MenuItem
 
 
 class MenuRepo:
@@ -33,18 +34,26 @@ class MenuRepo:
     def create(self, restaurant_id: int, data: dict[str, Any]) -> dict[str, Any]:
         def add(records: list[dict]) -> dict[str, Any]:
             new_id = max((r["id"] for r in records), default=0) + 1
-            item = {"id": new_id, "restaurant_id": restaurant_id, **data}
+            item = {"id": new_id, "restaurant_id": restaurant_id, "active": True, **data}
             records.append(item)
             return item
 
         return update_records(self.file_path, add)
 
     def update(self, item_id: int, changes: dict[str, Any]) -> dict[str, Any] | None:
+        """Update a menu item after validating saved data."""
         def apply(records: list[dict]) -> dict[str, Any] | None:
+            """Validate records before applying changes."""
+            for record in records:
+                MenuItem.model_validate(record, strict=True)
+
             for record in records:
                 if record["id"] == item_id:
+                    updated = {**record, **changes}
+                    MenuItem.model_validate(updated, strict=True)
                     record.update(changes)
                     return record
+
             return None
 
         return update_records(self.file_path, apply)

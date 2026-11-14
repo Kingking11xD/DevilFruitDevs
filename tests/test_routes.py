@@ -5,6 +5,9 @@ import pytest
 from fastapi.testclient import TestClient
 from app.api.routes import menu
 from app.api.routes import restaurants
+from app.api import dependencies
+from app.repositories.account_repo import AccountRepo
+from app.services import token_service
 from main import app
 
 client = TestClient(app)
@@ -392,7 +395,7 @@ def test_invalid_menu_restaurant_id(restaurant_id: str) -> None:
     response = client.get(f"/restaurants/{restaurant_id}/menu-items")
 
     assert response.status_code == 422
-    
+
 @pytest.fixture
 def menu_item_files(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> list[dict]:
     restaurant_data = [
@@ -415,11 +418,55 @@ def menu_item_files(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> list[dic
     return menu_data
 
 
+@pytest.fixture
+def menu_auth(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> dict:
+    """Create test accounts and authentication headers for menu updates."""
+    path = tmp_path / "accounts.json"
+    path.write_text("[]", encoding="utf-8")
+
+    monkeypatch.setattr(dependencies.repository, "file_path", path)
+    monkeypatch.setattr(token_service, "sessions", {})
+
+    repo = AccountRepo(path)
+
+    accounts = {
+        "admin": repo.create_staff(
+            "Admin", "admin@test.com", "unused-hash", "admin", []
+        ),
+        "assigned": repo.create_staff(
+            "Manager", "manager@test.com", "unused-hash",
+            "restaurant_user", [1]
+        ),
+        "unassigned": repo.create_staff(
+            "Other Manager", "other@test.com", "unused-hash",
+            "restaurant_user", [2]
+        ),
+        "customer": repo.create(
+            "Customer", "customer@test.com", "unused-hash"
+        ),
+        "inactive": repo.create_staff(
+            "Inactive", "inactive@test.com", "unused-hash",
+            "restaurant_user", [1]
+        ),
+    }
+
+    repo.update(accounts["inactive"]["id"], {"active": False})
+
+    return {
+        role: {
+            "Authorization": (
+                f"Bearer {token_service.create_access_token(account['id'])}"
+            )
+        }
+        for role, account in accounts.items()
+    }
+
+
 def test_menu_item(menu_item_files) -> None:
     response = client.get("/restaurants/1/menu-items/1")
 
     assert response.status_code == 200
-    assert response.json() == menu_item_files[0]
+    assert response.json() == {**menu_item_files[0], "active": True}
 
 
 def test_menu_item_unavailable_is_returned(menu_item_files) -> None:
@@ -508,37 +555,151 @@ def test_add_menu_item_unknown_restaurant(menu_item_files):
 def test_add_menu_item_invalid_body(menu_item_files, body):
     assert client.post("/restaurants/1/menu-items", json=body).status_code == 422
 
-def test_update_menu_item(menu_item_files):
-    response = client.patch("/restaurants/1/menu-items/1", json={"price": 1900})
+def test_update_menu_item(menu_item_files, menu_auth):
+    response = client.patch("/restaurants/1/menu-items/1", json={"price": 1900}, headers=menu_auth["assigned"])
 
     assert response.status_code == 200
-    assert response.json() == {**menu_item_files[0], "price": 1900}
+    assert response.json() == {
+        **menu_item_files[0],
+        "price": 1900,
+        "active": True,
+    }
     assert client.get("/restaurants/1/menu-items/1").json()["price"] == 1900
 
 
-def test_update_menu_item_availability(menu_item_files):
-    response = client.patch("/restaurants/2/menu-items/2", json={"available": True})
+def test_update_menu_item_availability(menu_item_files, menu_auth):
+    response = client.patch("/restaurants/2/menu-items/2", json={"available": True}, headers=menu_auth["admin"])
 
     assert response.status_code == 200
     assert response.json()["available"] is True
 
 
-def test_update_menu_item_unknown_restaurant(menu_item_files):
-    response = client.patch("/restaurants/999/menu-items/1", json={"price": 100})
+def test_deactivate_menu_item(menu_item_files, menu_auth):
+    """Test that an authorized manager can deactivate a menu item."""
+    other_item_before = menu.menu_repository.get_by_id(2).copy()
+
+    response = client.patch(
+        "/restaurants/1/menu-items/1",
+        json={"active": False},
+        headers=menu_auth["assigned"]
+    )
+
+    assert response.status_code == 200
+    assert response.json()["active"] is False
+
+    saved_item = menu.menu_repository.get_by_id(1)
+    assert saved_item["active"] is False
+    assert saved_item["available"] is True
+    assert menu.menu_repository.get_by_id(2) == other_item_before
+
+
+def test_reactivate_menu_item(menu_item_files, menu_auth):
+    """Test that an authorized manager can reactivate a menu item."""
+    menu.menu_repository.update(1, {"active": False})
+
+    response = client.patch(
+        "/restaurants/1/menu-items/1",
+        json={"active": True},
+        headers=menu_auth["assigned"]
+    )
+
+    assert response.status_code == 200
+    assert response.json()["active"] is True
+    assert menu.menu_repository.get_by_id(1)["active"] is True
+    assert menu.menu_repository.get_by_id(1)["available"] is True
+
+
+def test_deactivated_menu_item_visible_to_public(menu_item_files, menu_auth):
+    """Test that public menus show deactivated item status."""
+    response = client.patch(
+        "/restaurants/1/menu-items/1",
+        json={"active": False},
+        headers=menu_auth["assigned"]
+    )
+    assert response.status_code == 200
+
+    menu_response = client.get("/restaurants/1/menu-items")
+    assert menu_response.status_code == 200
+    assert menu_response.json()[0]["active"] is False
+    assert menu_response.json()[0]["available"] is True
+
+    item_response = client.get("/restaurants/1/menu-items/1")
+    assert item_response.status_code == 200
+    assert item_response.json()["active"] is False
+    assert item_response.json()["available"] is True
+
+
+def test_update_menu_item_requires_auth(menu_item_files):
+    """Test that menu updates require authentication."""
+    path = Path(menu.menu_repository.file_path)
+    before = path.read_bytes()
+
+    response = client.patch(
+        "/restaurants/1/menu-items/1",
+        json={"available": False},
+    )
+
+    assert response.status_code == 401
+    assert response.json() == {"detail": "Authentication required"}
+    assert path.read_bytes() == before
+
+
+@pytest.mark.parametrize("role", ["admin", "assigned"])
+def test_update_menu_item_authorized(menu_item_files, menu_auth, role):
+    """Test that authorized users can update menu item availability."""
+    response = client.patch(
+        "restaurants/1/menu-items/1",
+        json={"available": False},
+        headers=menu_auth[role],
+    )
+
+    assert response.status_code == 200
+    assert response.json()["available"] is False
+    assert menu.menu_repository.get_by_id(1)["available"] is False
+
+
+@pytest.mark.parametrize(
+    "role, expected_detail",
+    [
+        ("unassigned", "Restaurant access is not allowed"),
+        ("customer", "Account role is not allowed"),
+        ("inactive", "Account is inactive"),
+    ],
+)
+def test_update_menu_item_forbidden(
+    menu_item_files, menu_auth, role, expected_detail
+):
+    """Test that unauthorized users can't update menu items."""
+    path = Path(menu.menu_repository.file_path)
+    before = path.read_bytes()
+
+    response = client.patch(
+        "/restaurants/1/menu-items/1",
+        json={"available": False},
+        headers=menu_auth[role],
+    )
+
+    assert response.status_code == 403
+    assert response.json() == {"detail": expected_detail}
+    assert path.read_bytes() == before
+
+
+def test_update_menu_item_unknown_restaurant(menu_item_files, menu_auth):
+    response = client.patch("/restaurants/999/menu-items/1", json={"price": 100}, headers=menu_auth["admin"])
 
     assert response.status_code == 404
     assert response.json() == {"detail": "Restaurant not found"}
 
 
-def test_update_menu_item_unknown_item(menu_item_files):
-    response = client.patch("/restaurants/1/menu-items/999", json={"price": 100})
+def test_update_menu_item_unknown_item(menu_item_files, menu_auth):
+    response = client.patch("/restaurants/1/menu-items/999", json={"price": 100}, headers=menu_auth["assigned"])
 
     assert response.status_code == 404
     assert response.json() == {"detail": "Menu item not found"}
 
 
-def test_update_menu_item_from_another_restaurant(menu_item_files):
-    response = client.patch("/restaurants/1/menu-items/2", json={"price": 100})
+def test_update_menu_item_from_another_restaurant(menu_item_files, menu_auth):
+    response = client.patch("/restaurants/1/menu-items/2", json={"price": 100}, headers=menu_auth["admin"])
 
     assert response.status_code == 404
     assert response.json() == {"detail": "Menu item not found"}
@@ -557,8 +718,8 @@ def test_update_menu_item_from_another_restaurant(menu_item_files):
     {"prcie": 100},  # typo on purpose: unknown fields must return 422
     {"id": 99},
 ])
-def test_update_menu_item_invalid_body(menu_item_files, body):
-    assert client.patch("/restaurants/1/menu-items/1", json=body).status_code == 422
+def test_update_menu_item_invalid_body(menu_item_files, menu_auth, body):
+    assert client.patch("/restaurants/1/menu-items/1", json=body, headers=menu_auth["admin"]).status_code == 422
 
 
 def fail_to_save(*args, **kwargs):
@@ -574,10 +735,10 @@ def test_add_menu_item_storage_error(menu_item_files, monkeypatch):
     assert response.json() == {"detail": "Menu item data could not be saved"}
 
 
-def test_update_menu_item_storage_error(menu_item_files, monkeypatch):
+def test_update_menu_item_storage_error(menu_item_files, menu_auth, monkeypatch):
     monkeypatch.setattr(menu.menu_repository, "update", fail_to_save)
 
-    response = client.patch("/restaurants/1/menu-items/1", json={"price": 1900})
+    response = client.patch("/restaurants/1/menu-items/1", json={"price": 1900}, headers=menu_auth["admin"])
 
     assert response.status_code == 500
     assert response.json() == {"detail": "Menu item data could not be saved"}
