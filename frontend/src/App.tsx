@@ -2,6 +2,7 @@ import { useEffect, useState, FormEvent } from "react";
 import { Restaurant, RestaurantCreate, RestaurantUpdate } from "./types/restaurant";
 import { fetchRestaurants, createRestaurant, updateRestaurant } from "./api/restaurants";
 import CustomerApp from "./CustomerApp";
+import CartApp from "./CartApp";
 
 export default function App() {
   const [restaurants, setRestaurants] = useState<Restaurant[]>([]);
@@ -12,10 +13,8 @@ export default function App() {
   
   const [refresh, setRefresh] = useState(0);
   const [isAdmin, setIsAdmin] = useState(false);
-  const [activeTab, setActiveTab] = useState<'restaurants' | 'profile'>('restaurants');
+  const [activeTab, setActiveTab] = useState<'restaurants' | 'profile' | 'cart'>('restaurants');
   
-  // Keep authentication token in memory above the tabs so it survives tab navigation
-  // while requiring sign-in after a full page reload (per m2-design.md)
   const [token, setToken] = useState<string | null>(null);
 
   const [newRestaurant, setNewRestaurant] = useState<RestaurantCreate>({
@@ -68,7 +67,6 @@ export default function App() {
     if (!newRestaurant.name || !newRestaurant.cuisine || !newRestaurant.address) {
       return;
     }
-
     try {
       await createRestaurant(newRestaurant);
       setNewRestaurant({ name: "", cuisine: "", address: "" });
@@ -87,6 +85,21 @@ export default function App() {
       alert(err instanceof Error ? err.message : "Failed to update restaurant");
     }
   };
+
+  const tabStyle = (tabName: string) => ({
+    padding: '0.75rem 1.5rem',
+    backgroundColor: activeTab === tabName ? '#8b0000' : '#3e2723',
+    color: '#ffd700',
+    border: '3px solid #ffd700',
+    borderRadius: '6px',
+    cursor: 'pointer',
+    fontWeight: 'bold',
+    fontSize: '1.1rem',
+    fontFamily: 'inherit',
+    boxShadow: activeTab === tabName ? 'inset 0 0 10px rgba(0,0,0,0.5)' : '3px 3px 0px rgba(0,0,0,0.5)',
+    transform: activeTab === tabName ? 'translateY(2px)' : 'none',
+    transition: 'all 0.1s ease-in-out'
+  });
 
   return (
     <>
@@ -108,44 +121,15 @@ export default function App() {
           </header>
 
           {/* Navigation Tabs */}
-          <nav style={{ display: 'flex', justifyContent: 'center', gap: '1rem', marginBottom: '2.5rem', borderBottom: '2px solid #a67b5b', paddingBottom: '1.5rem' }}>
-            <button
-              onClick={() => setActiveTab('restaurants')}
-              style={{
-                padding: '0.75rem 1.5rem',
-                backgroundColor: activeTab === 'restaurants' ? '#8b0000' : '#3e2723',
-                color: '#ffd700',
-                border: '3px solid #ffd700',
-                borderRadius: '6px',
-                cursor: 'pointer',
-                fontWeight: 'bold',
-                fontSize: '1.1rem',
-                fontFamily: 'inherit',
-                boxShadow: activeTab === 'restaurants' ? 'inset 0 0 10px rgba(0,0,0,0.5)' : '3px 3px 0px rgba(0,0,0,0.5)',
-                transform: activeTab === 'restaurants' ? 'translateY(2px)' : 'none',
-                transition: 'all 0.1s ease-in-out'
-              }}
-            >
+          <nav style={{ display: 'flex', justifyContent: 'center', flexWrap: 'wrap', gap: '1rem', marginBottom: '2.5rem', borderBottom: '2px solid #a67b5b', paddingBottom: '1.5rem' }}>
+            <button onClick={() => setActiveTab('restaurants')} style={tabStyle('restaurants')}>
               🍖 Find Grub
             </button>
-            <button
-              onClick={() => setActiveTab('profile')}
-              style={{
-                padding: '0.75rem 1.5rem',
-                backgroundColor: activeTab === 'profile' ? '#8b0000' : '#3e2723',
-                color: '#ffd700',
-                border: '3px solid #ffd700',
-                borderRadius: '6px',
-                cursor: 'pointer',
-                fontWeight: 'bold',
-                fontSize: '1.1rem',
-                fontFamily: 'inherit',
-                boxShadow: activeTab === 'profile' ? 'inset 0 0 10px rgba(0,0,0,0.5)' : '3px 3px 0px rgba(0,0,0,0.5)',
-                transform: activeTab === 'profile' ? 'translateY(2px)' : 'none',
-                transition: 'all 0.1s ease-in-out'
-              }}
-            >
+            <button onClick={() => setActiveTab('profile')} style={tabStyle('profile')}>
               ⚓ Captain's Log
+            </button>
+            <button onClick={() => setActiveTab('cart')} style={tabStyle('cart')}>
+              🛒 Ship's Cargo
             </button>
           </nav>
 
@@ -159,10 +143,16 @@ export default function App() {
             </section>
           )}
 
+          {/* Tab Content: Cart */}
+          {activeTab === 'cart' && (
+            <section style={{ marginBottom: "2.5rem" }}>
+               <CartApp token={token} />
+            </section>
+          )}
+
           {/* Tab Content: Restaurants */}
           {activeTab === 'restaurants' && (
             <>
-              {/* Admin Toggle */}
               <div style={{ display: 'flex', justifyContent: 'flex-end', marginBottom: '2rem' }}>
                 <button 
                   onClick={() => setIsAdmin(!isAdmin)} 
@@ -187,21 +177,11 @@ export default function App() {
               <section style={{ display: "flex", gap: "1.5rem", marginBottom: "2.5rem", flexWrap: "wrap" }}>
                 <div style={{ flex: 1, minWidth: "200px", position: "relative" }}>
                   <span style={{ position: "absolute", left: "12px", top: "14px", fontSize: "1.2rem" }}>🔭</span>
-                  <input
-                    placeholder="Search islands for food..."
-                    value={search}
-                    onChange={(e) => setSearch(e.target.value)}
-                    style={{ width: "100%", boxSizing: "border-box", padding: "0.85rem 0.85rem 0.85rem 2.8rem", border: "2px solid #8b0000", borderRadius: "6px", backgroundColor: "#fff8dc", fontSize: "1.1rem", fontFamily: "inherit" }}
-                  />
+                  <input placeholder="Search islands for food..." value={search} onChange={(e) => setSearch(e.target.value)} style={{ width: "100%", boxSizing: "border-box", padding: "0.85rem 0.85rem 0.85rem 2.8rem", border: "2px solid #8b0000", borderRadius: "6px", backgroundColor: "#fff8dc", fontSize: "1.1rem", fontFamily: "inherit" }} />
                 </div>
                 <div style={{ width: "280px", position: "relative" }}>
                   <span style={{ position: "absolute", left: "12px", top: "14px", fontSize: "1.2rem" }}>🍖</span>
-                  <input
-                    placeholder="Filter by Grub..."
-                    value={cuisineFilter}
-                    onChange={(e) => setCuisineFilter(e.target.value)}
-                    style={{ width: "100%", boxSizing: "border-box", padding: "0.85rem 0.85rem 0.85rem 2.8rem", border: "2px solid #8b0000", borderRadius: "6px", backgroundColor: "#fff8dc", fontSize: "1.1rem", fontFamily: "inherit" }}
-                  />
+                  <input placeholder="Filter by Grub..." value={cuisineFilter} onChange={(e) => setCuisineFilter(e.target.value)} style={{ width: "100%", boxSizing: "border-box", padding: "0.85rem 0.85rem 0.85rem 2.8rem", border: "2px solid #8b0000", borderRadius: "6px", backgroundColor: "#fff8dc", fontSize: "1.1rem", fontFamily: "inherit" }} />
                 </div>
               </section>
 
@@ -211,53 +191,16 @@ export default function App() {
               {!loading && restaurants.length === 0 ? (
                 <p style={{ textAlign: "center", fontSize: "1.3rem", fontStyle: "italic", color: "#555" }}>No taverns found in these waters.</p>
               ) : (
-                <div style={{ 
-                  display: isAdmin ? "block" : "grid", 
-                  gridTemplateColumns: isAdmin ? "1fr" : "repeat(auto-fill, minmax(260px, 1fr))", 
-                  gap: "2rem" 
-                }}>
+                <div style={{ display: isAdmin ? "block" : "grid", gridTemplateColumns: isAdmin ? "1fr" : "repeat(auto-fill, minmax(260px, 1fr))", gap: "2rem" }}>
                   {restaurants.map((item) => (
-                    <div
-                      key={item.id}
-                      style={isAdmin ? {
-                        borderBottom: "2px solid #a67b5b",
-                        padding: "1rem 0",
-                        display: "flex",
-                        justifyContent: "space-between",
-                        alignItems: "center"
-                      } : { 
-                         backgroundColor: "#fdf6e3", 
-                         border: "3px solid #3e2723", 
-                         boxShadow: "6px 6px 0px rgba(62,39,35,0.9)",
-                         padding: "1.5rem",
-                         display: "flex",
-                         flexDirection: "column",
-                         alignItems: "center",
-                         textAlign: "center",
-                         position: "relative"
-                      }}
-                    >
-                      {!isAdmin && (
-                        <div style={{ position: "absolute", top: "-12px", left: "50%", transform: "translateX(-50%)", width: "24px", height: "24px", backgroundColor: "#8b0000", borderRadius: "50%", border: "3px solid #3e2723", boxShadow: "2px 3px 4px rgba(0,0,0,0.6)" }}></div>
-                      )}
+                    <div key={item.id} style={isAdmin ? { borderBottom: "2px solid #a67b5b", padding: "1rem 0", display: "flex", justifyContent: "space-between", alignItems: "center" } : { backgroundColor: "#fdf6e3", border: "3px solid #3e2723", boxShadow: "6px 6px 0px rgba(62,39,35,0.9)", padding: "1.5rem", display: "flex", flexDirection: "column", alignItems: "center", textAlign: "center", position: "relative" }}>
+                      {!isAdmin && <div style={{ position: "absolute", top: "-12px", left: "50%", transform: "translateX(-50%)", width: "24px", height: "24px", backgroundColor: "#8b0000", borderRadius: "50%", border: "3px solid #3e2723", boxShadow: "2px 3px 4px rgba(0,0,0,0.6)" }}></div>}
 
                       {editingId === item.id ? (
                         <div style={{ display: "flex", gap: "1rem", flex: 1, marginRight: "1rem", flexWrap: "wrap" }}>
-                          <input
-                            value={editFormData.name || ""}
-                            onChange={(e) => setEditFormData({ ...editFormData, name: e.target.value })}
-                            style={{ padding: "0.5rem", flex: 1, border: "1px solid #8b0000" }}
-                          />
-                          <input
-                            value={editFormData.cuisine || ""}
-                            onChange={(e) => setEditFormData({ ...editFormData, cuisine: e.target.value })}
-                            style={{ padding: "0.5rem", width: "120px", border: "1px solid #8b0000" }}
-                          />
-                          <input
-                            value={editFormData.address || ""}
-                            onChange={(e) => setEditFormData({ ...editFormData, address: e.target.value })}
-                            style={{ padding: "0.5rem", flex: 2, border: "1px solid #8b0000" }}
-                          />
+                          <input value={editFormData.name || ""} onChange={(e) => setEditFormData({ ...editFormData, name: e.target.value })} style={{ padding: "0.5rem", flex: 1, border: "1px solid #8b0000" }} />
+                          <input value={editFormData.cuisine || ""} onChange={(e) => setEditFormData({ ...editFormData, cuisine: e.target.value })} style={{ padding: "0.5rem", width: "120px", border: "1px solid #8b0000" }} />
+                          <input value={editFormData.address || ""} onChange={(e) => setEditFormData({ ...editFormData, address: e.target.value })} style={{ padding: "0.5rem", flex: 2, border: "1px solid #8b0000" }} />
                         </div>
                       ) : (
                         <div style={isAdmin ? { flex: 1 } : { width: "100%", flex: 1, marginTop: "0.5rem" }}>
@@ -286,25 +229,11 @@ export default function App() {
                               <button onClick={() => setEditingId(null)} style={{ border: "1px solid #ccc", padding: "0.4rem 1rem", cursor: "pointer", borderRadius: "4px" }}>Cancel</button>
                             </>
                           ) : (
-                            <button 
-                              style={{ border: "2px solid #3e2723", padding: "0.4rem 1rem", cursor: "pointer", backgroundColor: "#fff8dc", borderRadius: "4px", fontWeight: "bold" }}
-                              onClick={() => {
-                                setEditingId(item.id);
-                                setEditFormData({ name: item.name, cuisine: item.cuisine, address: item.address });
-                              }}
-                            >
-                              Edit
-                            </button>
+                            <button onClick={() => { setEditingId(item.id); setEditFormData({ name: item.name, cuisine: item.cuisine, address: item.address }); }} style={{ border: "2px solid #3e2723", padding: "0.4rem 1rem", cursor: "pointer", backgroundColor: "#fff8dc", borderRadius: "4px", fontWeight: "bold" }}>Edit</button>
                           )}
                         </div>
                       ) : (
-                        <button 
-                          style={{ backgroundColor: "#8b0000", color: "#fff", border: "2px solid #3e2723", padding: "0.85rem", width: "100%", fontWeight: "bold", cursor: "pointer", fontSize: "1.1rem", textTransform: "uppercase", letterSpacing: "1px", fontFamily: "inherit", boxShadow: "0 4px 0px #3e2723" }} 
-                          onMouseDown={(e) => e.currentTarget.style.transform = "translateY(4px)"}
-                          onMouseUp={(e) => e.currentTarget.style.transform = "translateY(0)"}
-                          onMouseLeave={(e) => e.currentTarget.style.transform = "translateY(0)"}
-                          onClick={() => alert(`Summoning a delivery snail to ${item.name}!`)}
-                        >
+                        <button onClick={() => alert(`Summoning a delivery snail to ${item.name}!`)} style={{ backgroundColor: "#8b0000", color: "#fff", border: "2px solid #3e2723", padding: "0.85rem", width: "100%", fontWeight: "bold", cursor: "pointer", fontSize: "1.1rem", textTransform: "uppercase", letterSpacing: "1px", fontFamily: "inherit", boxShadow: "0 4px 0px #3e2723" }} onMouseDown={(e) => e.currentTarget.style.transform = "translateY(4px)"} onMouseUp={(e) => e.currentTarget.style.transform = "translateY(0)"} onMouseLeave={(e) => e.currentTarget.style.transform = "translateY(0)"}>
                           Send Snail 🐌
                         </button>
                       )}
