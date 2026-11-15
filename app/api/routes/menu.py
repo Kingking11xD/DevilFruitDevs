@@ -83,10 +83,13 @@ def get_menu_item(
     status_code=status.HTTP_201_CREATED,
     summary="Add a menu item",
     responses={
+        401: {"description": "Authentication required"},
+        403: {"description": "Not authorized to manage this restaurant"},
         404: {"description": "Restaurant not found"},
         422: {"description": "Invalid menu item information"},
         500: {"description": "Menu item data could not be saved"},
     },
+    dependencies=[Depends(get_restaurant_manager)],
 )
 def add_menu_item(
     restaurant_id: Annotated[int, Path(gt=0)],

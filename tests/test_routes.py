@@ -523,10 +523,11 @@ def test_menu_item_does_not_modify_data(tmp_path, menu_item_files) -> None:
 
     assert Path(menu_path).read_bytes() == before
 
-def test_add_menu_item(menu_item_files):
+def test_add_menu_item(menu_item_files, menu_auth):
     response = client.post(
         "/restaurants/1/menu-items",
         json={"name": "Calzone", "price": 1700},
+        headers=menu_auth["assigned"],
     )
     assert response.status_code == 201
     body = response.json()
@@ -536,8 +537,43 @@ def test_add_menu_item(menu_item_files):
     assert client.get(f"/restaurants/1/menu-items/{body['id']}").status_code == 200
 
 
-def test_add_menu_item_unknown_restaurant(menu_item_files):
-    response = client.post("/restaurants/999/menu-items", json={"name": "X", "price": 100})
+def test_add_menu_item_requires_auth(menu_item_files):
+    """Test that creating a menu item requires authentication."""
+    menu_path = menu.menu_repository.file_path
+    menu_before = menu_path.read_bytes()
+
+    response = client.post(
+        "/restaurants/1/menu-items",
+        json={"name": "Calzone", "price": 1700},
+    )
+
+    assert response.status_code == 401
+    assert response.json()["detail"] == "Authentication required"
+    assert menu_path.read_bytes() == menu_before
+
+
+@pytest.mark.parametrize("role", ["unassigned", "customer", "inactive"])
+def test_add_menu_item_forbidden(menu_item_files, menu_auth, role):
+    """Test that unauthorized users can't create menu items."""
+    menu_path = menu.menu_repository.file_path
+    menu_before = menu_path.read_bytes()
+
+    response = client.post(
+        "/restaurants/1/menu-items",
+        json={"name": "Calzone", "price": 1700},
+        headers=menu_auth[role],
+    )
+
+    assert response.status_code == 403
+    assert menu_path.read_bytes() == menu_before
+
+
+def test_add_menu_item_unknown_restaurant(menu_item_files, menu_auth):
+    response = client.post(
+        "/restaurants/999/menu-items",
+        json={"name": "X", "price": 100},
+        headers=menu_auth["admin"],
+    )
     assert response.status_code == 404
 
 
@@ -552,8 +588,8 @@ def test_add_menu_item_unknown_restaurant(menu_item_files):
     {"name": "X", "price": 100, "id": 99},
     {"name": "X", "price": 100, "restaurant_id": 2},
 ])
-def test_add_menu_item_invalid_body(menu_item_files, body):
-    assert client.post("/restaurants/1/menu-items", json=body).status_code == 422
+def test_add_menu_item_invalid_body(menu_item_files, menu_auth, body):
+    assert client.post("/restaurants/1/menu-items", json=body, headers=menu_auth["assigned"]).status_code == 422
 
 def test_update_menu_item(menu_item_files, menu_auth):
     response = client.patch("/restaurants/1/menu-items/1", json={"price": 1900}, headers=menu_auth["assigned"])
@@ -719,17 +755,21 @@ def test_update_menu_item_from_another_restaurant(menu_item_files, menu_auth):
     {"id": 99},
 ])
 def test_update_menu_item_invalid_body(menu_item_files, menu_auth, body):
-    assert client.patch("/restaurants/1/menu-items/1", json=body, headers=menu_auth["admin"]).status_code == 422
+    assert client.patch("/restaurants/1/menu-items/1", json=body, headers=menu_auth["assigned"]).status_code == 422
 
 
 def fail_to_save(*args, **kwargs):
     raise OSError("disk full")
 
 
-def test_add_menu_item_storage_error(menu_item_files, monkeypatch):
+def test_add_menu_item_storage_error(menu_item_files, menu_auth, monkeypatch):
     monkeypatch.setattr(menu.menu_repository, "create", fail_to_save)
 
-    response = client.post("/restaurants/1/menu-items", json={"name": "Calzone", "price": 1700})
+    response = client.post(
+        "/restaurants/1/menu-items",
+        json={"name": "Calzone", "price": 1700},
+        headers=menu_auth["assigned"],
+    )
 
     assert response.status_code == 500
     assert response.json() == {"detail": "Menu item data could not be saved"}
