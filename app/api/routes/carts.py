@@ -2,14 +2,15 @@
 
 from typing import Annotated, Any
 
-from fastapi import APIRouter, Depends, HTTPException, Response, status
+from fastapi import APIRouter, Depends, HTTPException, Response, status, Path
 
 from app.api.dependencies import get_current_customer
 from app.repositories.cart_repo import CartRepo
 from app. repositories.menu_repo import MenuRepo
-from app.schemas.cart import Cart, CartItemAdd
+from app.schemas.cart import Cart, CartItemAdd, CartItemUpdate, CartDetail
 from app.services.cart_service import (
     CartNotFoundError,
+    CartItemNotFoundError,
     CartRestaurantMismatchError,
     CartService,
     MenuItemNotAvailableError,
@@ -60,11 +61,12 @@ def create_cart(
 
 @router.get(
     "/customers/me/cart",
-    response_model=Cart,
-    summary="Get active cart",
+    response_model=CartDetail,
+    summary="View my cart and total",
     description=(
-        "Retrieve the signed in customer's active cart."
-        "This endpoint doesn't create a new cart."
+        "Get the authenticated customer's active cart with current "
+        "menu item prices, quantities, line totals, subtotal, total, "
+        "and item problems."
     ),
     responses={
         401: {"description": "Authentication required"},
@@ -75,26 +77,23 @@ def create_cart(
 )
 def get_cart(
     account: Annotated[dict[str, Any], Depends(get_current_customer)],
-) -> Cart:
-    """Return the customer's active cart without creating one."""
+) -> CartDetail:
+    """Return the customer's active cart with calculated totals."""
     try:
-        cart = repository.get_active_for_customer(account["id"])
+        cart = service.get_cart_details(account["id"])
+        return CartDetail.model_validate(cart)
 
-        if cart is None:
-            raise HTTPException(
-                status_code=404,
-                detail="Active cart not found",
-            )
+    except CartNotFoundError as error:
+        raise HTTPException(
+            status_code=404,
+            detail="Active cart not found",
+        ) from error
 
-        validated_cart = Cart.model_validate(cart)
-
-    except (OSError, ValueError) as error:
+    except (OSError, ValueError, KeyError, TypeError) as error:
         raise HTTPException(
             status_code=500,
             detail="Cart storage is unavailable",
         ) from error
-
-    return validated_cart
 
 
 @router.post(
@@ -151,3 +150,127 @@ def add_cart_item(
         ) from error
 
     return validated_cart
+
+
+@router.patch(
+    "/customers/me/cart/items/{item_id}",
+    response_model=CartDetail,
+    status_code=200,
+    summary="Update item quantity in my cart",
+    description=(
+        "Replace the quantity of an existing item in the signed in "
+        "customer's active cart and return the updated cart with totals."
+    ),
+    responses={
+        401: {"description": "Authentication required"},
+        403: {"description": "Customer account is inactive or unauthorized"},
+        404: {"description": "Cart or cart item not found"},
+        422: {"description": "Invalid item ID or quantity"},
+        500: {"description": "Cart storage is unavailable"},
+    },
+)
+def update_cart_item_quantity(
+    item_id: Annotated[
+        int,
+        Path(gt=0, description="Menu item ID of the item in the cart"),
+    ],
+    item: CartItemUpdate,
+    account: Annotated[dict[str, Any], Depends(get_current_customer)],
+) -> CartDetail:
+    """Update an existing cart item's quantity and return updated totals."""
+    try:
+        service.update_item_quantity(
+            customer_id=account["id"],
+            menu_item_id=item_id,
+            quantity=item.quantity,
+        )
+        cart = service.get_cart_details(account["id"])
+        return CartDetail.model_validate(cart)
+
+    except (CartNotFoundError, CartItemNotFoundError) as error:
+        raise HTTPException(
+            status_code=404,
+            detail=str(error),
+        ) from error
+
+    except (OSError, ValueError, KeyError, TypeError) as error:
+        raise HTTPException(
+            status_code=500,
+            detail="Cart storage is unavailable",
+        ) from error
+
+
+@router.delete(
+    "/customers/me/cart/items/{item_id}",
+    status_code=204,
+    summary="Remove an item from my cart",
+    description=(
+        "Remove an existing menu item from the signed in customer's  active cart."
+    ),
+    responses={
+        401: {"description": "Authentication required"},
+        403: {"description": "Customer account is inactive or unauthorized"},
+        404: {"description": "Cart or cart item not found"},
+        422: {"description": "Invalid item ID"},
+        500: {"description": "Cart storage is unavailable"},
+    },
+)
+def remove_cart_item(
+    item_id: Annotated[
+        int,
+        Path(gt=0, description="Menu item ID of the item in the cart"),
+    ],
+    account: Annotated[dict[str, Any], Depends(get_current_customer)],
+) -> None:
+    """Remove an existing item from the customer's active cart."""
+    try:
+        service.remove_item(
+            customer_id=account["id"],
+            menu_item_id=item_id,
+        )
+
+    except (CartNotFoundError, CartItemNotFoundError) as error:
+        raise HTTPException(
+            status_code=404,
+            detail=str(error),
+        ) from error
+    except (OSError, ValueError, KeyError, TypeError) as error:
+        raise HTTPException(
+            status_code=500,
+            detail="Cart storage is unavailable",
+        ) from error
+
+
+@router.delete(
+    "/customers/me/cart/items",
+    status_code=204,
+    summary="Clear my cart",
+    description=(
+        "Remove all items from the signed in customer's active cart "
+        "and reset its restaurant. Clearing an empty cart also succeeds."
+    ),
+    responses={
+        401: {"description": "Authentication required"},
+        403: {"description": "Customer account is inactive or unauthorized"},
+        404: {"description": "Active cart not found"},
+        500: {"description": "Cart storage is unavailable"},
+    },
+)
+def clear_cart(
+    account: Annotated[dict[str, Any], Depends(get_current_customer)],
+) -> None:
+    """Remove all items from the customer's active cart."""
+    try:
+        service.clear_cart(customer_id=account["id"])
+
+    except CartNotFoundError as error:
+        raise HTTPException(
+            status_code=404,
+            detail=str(error),
+        ) from error
+
+    except (OSError, ValueError, KeyError, TypeError) as error:
+        raise HTTPException(
+            status_code=500,
+            detail="Cart storage is unavailable",
+        ) from error
