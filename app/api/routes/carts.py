@@ -5,6 +5,7 @@ from typing import Annotated, Any
 from fastapi import APIRouter, Depends, HTTPException, Response, status, Path
 
 from app.api.dependencies import get_current_customer
+from app.api.routes.restaurants import repository as restaurant_repository
 from app.repositories.cart_repo import CartRepo
 from app. repositories.menu_repo import MenuRepo
 from app.schemas.cart import Cart, CartItemAdd, CartItemUpdate, CartDetail
@@ -16,11 +17,12 @@ from app.services.cart_service import (
     MenuItemNotAvailableError,
 )
 from app.services.menu_service import MenuItemNotFoundError
+from app.services.restaurant_service import RestaurantNotFoundError
 
 router = APIRouter()
 repository = CartRepo()
 menu_repository = MenuRepo()
-service = CartService(repository, menu_repository)
+service = CartService(repository, menu_repository, restaurant_repository)
 
 
 @router.post(
@@ -128,7 +130,7 @@ def add_cart_item(
         )
         validated_cart = Cart.model_validate(cart)
 
-    except (CartNotFoundError, MenuItemNotFoundError) as error:
+    except (CartNotFoundError, MenuItemNotFoundError, RestaurantNotFoundError) as error:
         raise HTTPException(
             status_code=404,
             detail=str(error),
