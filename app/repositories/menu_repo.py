@@ -43,10 +43,7 @@ class MenuRepo:
     def update(self, item_id: int, changes: dict[str, Any]) -> dict[str, Any] | None:
         """Update a menu item after validating saved data."""
         def apply(records: list[dict]) -> dict[str, Any] | None:
-            """Validate records before applying changes."""
-            for record in records:
-                MenuItem.model_validate(record, strict=True)
-
+            """Validate the updated menu item before applying changes."""
             for record in records:
                 if record["id"] == item_id:
                     updated = {**record, **changes}

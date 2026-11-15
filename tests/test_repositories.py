@@ -153,6 +153,41 @@ def test_menu_repo_update(tmp_path):
     assert repo.update(99, {"price": 1}) is None
 
 
+def test_menu_repo_update_with_unrelated_invalid_item(tmp_path):
+    """Test that an invalid unrelated item doesn't block an update."""
+    menu_file = tmp_path / "menu_items.json"
+    menu_data = [
+        {
+            "id": 1,
+            "restaurant_id": 1,
+            "name": "Burger",
+            "price": 100,
+            "available": True,
+            "active": True,
+        },
+        {
+            "id": 2,
+            "restaurant_id": 2,
+            "name": "Pizza",
+            "price": -10,
+            "available": True,
+            "active": True,
+        },
+    ]
+    menu_file.write_text(json.dumps(menu_data))
+
+    repo = MenuRepo()
+    repo.file_path = menu_file
+
+    updated = repo.update(1, {"available": False})
+
+    assert updated["available"] is False
+
+    saved_data = json.loads(menu_file.read_text())
+    assert saved_data[0]["available"] is False
+    assert saved_data[1] == menu_data[1]
+
+
 def test_menu_repo_update_invalid_saved_data(tmp_path: Path) -> None:
     """Test that invalid saved menu data is not modified."""
     path = tmp_path / "menu_items.json"
