@@ -3,7 +3,7 @@ import { useState, useEffect, FormEvent } from 'react';
 export interface CartItemDetail {
   menu_item_id: number;
   name?: string; 
-  price?: number;
+  unit_price?: number;
   quantity: number;
   line_total?: number;
   problems?: string[];
@@ -21,6 +21,41 @@ export interface CartDetail {
 interface CartAppProps {
   token: string | null;
   onCheckoutSuccess?: () => void;
+}
+
+// Helper to convert FastAPI string or array validation errors into readable text
+function formatErrorDetail(detail: unknown, fallback: string): string {
+  if (typeof detail === 'string' && detail.trim().length > 0) {
+    return detail;
+  }
+  if (Array.isArray(detail)) {
+    const messages = detail
+      .map((item) => {
+        if (typeof item === 'string') return item;
+        if (item && typeof item === 'object' && 'msg' in item) {
+          const loc = Array.isArray((item as { loc?: unknown[] }).loc)
+            ? (item as { loc: unknown[] }).loc.filter((part) => part !== 'body').join('.')
+            : '';
+          const msg = String((item as { msg: unknown }).msg);
+          return loc ? `${loc}: ${msg}` : msg;
+        }
+        return JSON.stringify(item);
+      })
+      .filter(Boolean);
+    if (messages.length > 0) {
+      return messages.join('; ');
+    }
+  }
+  return fallback;
+}
+
+async function parseErrorMessage(res: Response, fallback: string): Promise<string> {
+  try {
+    const data = await res.json();
+    return formatErrorDetail(data?.detail, fallback);
+  } catch {
+    return fallback;
+  }
 }
 
 export default function CartApp({ token, onCheckoutSuccess }: CartAppProps) {
@@ -50,8 +85,8 @@ export default function CartApp({ token, onCheckoutSuccess }: CartAppProps) {
       } else if (res.status === 404) {
         setCart(null);
       } else {
-        const errData = await res.json();
-        setMessage({ type: 'error', text: errData.detail || 'Failed to load cargo.' });
+        const errMsg = await parseErrorMessage(res, 'Failed to load cargo.');
+        setMessage({ type: 'error', text: errMsg });
       }
     } catch (err) {
       setMessage({ type: 'error', text: 'Network error checking the hold.' });
@@ -76,8 +111,8 @@ export default function CartApp({ token, onCheckoutSuccess }: CartAppProps) {
         const data = await res.json();
         setCart(data);
       } else {
-        const errData = await res.json();
-        setMessage({ type: 'error', text: errData.detail || 'Failed to adjust rations.' });
+        const errMsg = await parseErrorMessage(res, 'Failed to adjust rations.');
+        setMessage({ type: 'error', text: errMsg });
       }
     } catch (err) {
       setMessage({ type: 'error', text: 'Network error adjusting rations.' });
@@ -95,8 +130,8 @@ export default function CartApp({ token, onCheckoutSuccess }: CartAppProps) {
       if (res.ok) {
         fetchCart(); 
       } else {
-        const errData = await res.json();
-        setMessage({ type: 'error', text: errData.detail || 'Failed to throw overboard.' });
+        const errMsg = await parseErrorMessage(res, 'Failed to throw overboard.');
+        setMessage({ type: 'error', text: errMsg });
       }
     } catch (err) {
       setMessage({ type: 'error', text: 'Network error removing item.' });
@@ -115,8 +150,8 @@ export default function CartApp({ token, onCheckoutSuccess }: CartAppProps) {
         setCart(null);
         setMessage({ type: 'success', text: 'Hold emptied. Ready for new plunder!' });
       } else {
-        const errData = await res.json();
-        setMessage({ type: 'error', text: errData.detail || 'Failed to empty the hold.' });
+        const errMsg = await parseErrorMessage(res, 'Failed to empty the hold.');
+        setMessage({ type: 'error', text: errMsg });
       }
     } catch (err) {
       setMessage({ type: 'error', text: 'Network error emptying cart.' });
@@ -156,8 +191,8 @@ export default function CartApp({ token, onCheckoutSuccess }: CartAppProps) {
         setMessage({ type: 'success', text: 'Booty added to hold!' });
         fetchCart();
       } else {
-        const errData = await res.json();
-        setMessage({ type: 'error', text: errData.detail || 'Failed to add booty.' });
+        const errMsg = await parseErrorMessage(res, 'Failed to add booty.');
+        setMessage({ type: 'error', text: errMsg });
       }
     } catch (err) {
       setMessage({ type: 'error', text: 'Network error adding to cart.' });
@@ -186,11 +221,11 @@ export default function CartApp({ token, onCheckoutSuccess }: CartAppProps) {
         }
       } else {
         const errData = await res.json();
-        let errMsg = errData.detail || 'Failed to checkout.';
+        let errMsg = formatErrorDetail(errData.detail, 'Failed to checkout.');
         
         // Handle specific 409 TotalChangedError dictionary object
         if (typeof errData.detail === 'object' && errData.detail.message) {
-            errMsg = `${errData.detail.message}. New total: $${errData.detail.total.toFixed(2)}`;
+            errMsg = `${errData.detail.message}. New total: ${errData.detail.total} Berries`;
             fetchCart(); // Refresh cart to show the new prices
         } else if (res.status === 409) {
             fetchCart(); // Refresh cart for unavailable items
@@ -290,7 +325,7 @@ export default function CartApp({ token, onCheckoutSuccess }: CartAppProps) {
                     {item.name || `Mysterious Ration #${item.menu_item_id}`}
                   </h4>
                   <div style={{ fontSize: '0.9rem', color: '#555' }}>
-                    Unit Price: ${(item.price || 0).toFixed(2)}
+                    Unit Price: {item.unit_price || 0} Berries
                   </div>
                   {item.problems && item.problems.length > 0 && (
                     <div style={{ color: '#c62828', fontSize: '0.85rem', marginTop: '0.25rem', fontWeight: 'bold' }}>
@@ -313,7 +348,7 @@ export default function CartApp({ token, onCheckoutSuccess }: CartAppProps) {
                   </div>
                   
                   <div style={{ fontWeight: 'bold', color: '#3e2723', minWidth: '80px', textAlign: 'right', fontSize: '1.1rem' }}>
-                    ${(item.line_total || 0).toFixed(2)}
+                    {item.line_total || 0} Berries
                   </div>
 
                   <button 
@@ -331,11 +366,11 @@ export default function CartApp({ token, onCheckoutSuccess }: CartAppProps) {
           <div style={{ marginTop: '2rem', padding: '1.5rem', backgroundColor: '#eaddcf', border: '2px solid #a67b5b', borderRadius: '6px' }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '0.5rem', color: '#555', fontWeight: 'bold', fontSize: '1.1rem' }}>
               <span>Subtotal:</span>
-              <span>${(cart?.subtotal || 0).toFixed(2)}</span>
+              <span>{cart?.subtotal || 0} Berries</span>
             </div>
             <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '1.6rem', color: '#8b0000', fontWeight: 'bold', borderTop: '2px dashed #a67b5b', paddingTop: '1rem', marginTop: '0.5rem' }}>
               <span>Total Booty:</span>
-              <span>${(cart?.total || 0).toFixed(2)}</span>
+              <span>{cart?.total || 0} Berries</span>
             </div>
             <button 
                 onClick={handleCheckout}

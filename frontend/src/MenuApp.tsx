@@ -124,11 +124,11 @@ export default function MenuApp({ token, restaurantId, isAdmin, onAddToCart, onB
               />
               <input 
                 type="number" 
-                step="0.01" 
+                step="1" 
                 min="0"
-                placeholder="Price ($)" 
-                value={formData.price || ''} 
-                onChange={e => setFormData({...formData, price: parseFloat(e.target.value)})} 
+                placeholder="Price (Berries)" 
+                value={formData.price === 0 ? '' : formData.price} 
+                onChange={e => setFormData({...formData, price: parseInt(e.target.value, 10) || 0})} 
                 required 
                 style={{ padding: '0.75rem', flex: 1, border: '2px solid #8b0000', borderRadius: '4px', fontFamily: 'inherit' }} 
               />
@@ -193,7 +193,7 @@ export default function MenuApp({ token, restaurantId, isAdmin, onAddToCart, onB
               )}
 
               <h3 style={{ margin: '0 0 0.5rem 0', color: '#8b0000', fontSize: '1.4rem' }}>{item.name}</h3>
-              <div style={{ fontSize: '1.2rem', fontWeight: 'bold', color: '#3e2723', marginBottom: '0.75rem' }}>${item.price.toFixed(2)}</div>
+              <div style={{ fontSize: '1.2rem', fontWeight: 'bold', color: '#3e2723', marginBottom: '0.75rem' }}>{item.price} Berries</div>
               {item.description && <p style={{ color: '#555', fontStyle: 'italic', fontSize: '0.95rem', marginBottom: '1.5rem', minHeight: '40px' }}>"{item.description}"</p>}
 
               <div style={{ display: 'flex', gap: '0.5rem', marginTop: 'auto' }}>
