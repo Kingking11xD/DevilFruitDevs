@@ -1,12 +1,3 @@
 [
-  {
-    "id": 1,
-    "name": "luffy",
-    "email": "luffy@gmail.com",
-    "password_hash": "$argon2id$v=19$m=65536,t=3,p=4$ipDnUryCr8JxzhzUvpIGnQ$tG9o4FIEQM+qOcfIwaNvCbhWDAh1uhvB9VRNEoxAsws",
-    "role": "customer",
-    "active": true,
-    "delivery_address": "Elbalf",
-    "managed_restaurant_ids": []
-  }
+  
 ]
