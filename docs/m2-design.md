@@ -2,9 +2,8 @@
 
 Version: V2
 
-Last updated: November 4, 2026
+Last updated: November 16, 2026
 
-> **Working design for team review:** These are our proposed implementation choices. This document is separate from `docs/milestones/M2.md` and the required M2 team receipt. The lab schedule lists Receipt M2.2; the M2 assignment lists Team Receipt M2.3. Confirm whether these are separate submissions or a naming error, and confirm their templates and deadlines.
 
 Connect **Customer -> Restaurant -> Menu -> Cart -> Checkout -> Order** through the frontend and API. Keep M1 features working. Leave the complete order lifecycle, deliveries and reporting for M3.
 
@@ -75,7 +74,7 @@ Keep existing restaurant/menu endpoints, `/health` and `/docs`; apply the permis
 | PATCH / DELETE | `/customers/me/cart/items/{item_id}` | Set quantity / remove item. |
 | DELETE | `/customers/me/cart/items` | Clear cart contents. |
 | POST | `/carts/{cart_id}/checkout` | Check out this cart; body contains `expected_total`. |
-| GET | `/customers/me/orders` | List own orders. |
+| GET | `/orders` | List own orders. |
 | GET | `/orders/{order_id}` | Retrieve own order. |
 
 Return 201 for new resources, 200 for reads/updates and existing-cart/order retries, and 204 for successful DELETE operations. Deactivation returns 200 with the public account record. GET active cart returns 404 if absent. Use 401 for invalid/missing authentication; 403 for inactive accounts/disallowed roles; 404 for missing or another customer's private resources; 409 for duplicate email or state conflicts; 422 for invalid fields; 500 for storage failures. Errors follow M1's `detail` format and never expose credentials or file paths.
