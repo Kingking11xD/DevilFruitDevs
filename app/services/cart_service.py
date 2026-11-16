@@ -1,8 +1,10 @@
 from typing import Any
 
 from app.services.menu_service import MenuItemNotFoundError
+from app.services.restaurant_service import RestaurantNotFoundError
 from app.repositories.cart_repo import CartRepo
 from app.repositories.menu_repo import MenuRepo
+from app.repositories.restaurant_repo import RestaurantRepo
 from app.schemas.cart import Cart, CartItemUpdate
 
 
@@ -28,10 +30,12 @@ class CartService:
             self,
             cart_repository: CartRepo,
             menu_repository: MenuRepo,
+            restaurant_repository: RestaurantRepo,
     ) -> None:
-        """Initialize the cart service with its repository"""
+        """Initialize the cart service with its repositories."""
         self.cart_repository = cart_repository
         self.menu_repository = menu_repository
+        self.restaurant_repository = restaurant_repository
 
     def add_item(
             self,
@@ -47,6 +51,11 @@ class CartService:
 
         if not menu_item["available"] or not menu_item.get("active", True):
             raise MenuItemNotAvailableError("Menu item is unavailable")
+
+        if self.restaurant_repository.get_by_id(
+            menu_item["restaurant_id"]
+        ) is None:
+            raise RestaurantNotFoundError("Restaurant not found")
 
         cart = self.cart_repository.get_active_for_customer(customer_id)
 

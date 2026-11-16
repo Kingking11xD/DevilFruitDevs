@@ -6,7 +6,7 @@ from fastapi.testclient import TestClient
 
 from main import app
 from app.api import dependencies
-from app.api.routes import carts
+from app.api.routes import carts, restaurants
 from app.services import token_service
 from app.repositories.cart_repo import CartRepo
 from app.repositories.json_store import update_records
@@ -20,6 +20,22 @@ def client(tmp_path, monkeypatch):
 
     shopping_path = tmp_path / "shopping.json"
     shopping_path.write_text('{"carts": [], "orders": []}')
+
+    restaurant_path = tmp_path / "restaurants.json"
+    restaurant_path.write_text(json.dumps([
+        {
+            "id": 1,
+            "name": "Burger House",
+            "cuisine": "American",
+            "address": "1 Test Street",
+        },
+        {
+            "id": 2,
+            "name": "Pizza House",
+            "cuisine": "Italian",
+            "address": "2 Test Street",
+        },
+    ]))
 
     menu_file = tmp_path / "menu_items.json"
     menu_file.write_text(
@@ -59,6 +75,7 @@ def client(tmp_path, monkeypatch):
     )
     monkeypatch.setattr(token_service, "sessions", {})
     monkeypatch.setattr(carts.menu_repository, "file_path", menu_file)
+    monkeypatch.setattr(restaurants.repository, "file_path", restaurant_path)
 
     client = TestClient(app)
 
