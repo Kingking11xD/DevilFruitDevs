@@ -39,6 +39,7 @@ def client(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> Iterator[TestClie
     monkeypatch.setattr(dependencies.repository, "file_path", tmp_path / "accounts.json")
     monkeypatch.setattr(carts.repository, "file_path", tmp_path / "shopping.json")
     monkeypatch.setattr(carts.menu_repository, "file_path", tmp_path / "menu_items.json")
+    monkeypatch.setattr(carts.restaurant_repository, "file_path", tmp_path / "restaurants.json")
     monkeypatch.setattr(token_service, "sessions", {})
 
     with TestClient(app) as test_client:
