@@ -32,7 +32,7 @@ class CartService:
             menu_repository: MenuRepo,
             restaurant_repository: RestaurantRepo,
     ) -> None:
-        """Initialize the cart service with its repository"""
+        """Initialize the cart service with its repositories."""
         self.cart_repository = cart_repository
         self.menu_repository = menu_repository
         self.restaurant_repository = restaurant_repository

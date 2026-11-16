@@ -111,7 +111,7 @@ def get_cart(
     responses={
         401: {"description": "Authentication required"},
         403: {"description": "Customer account is inactive or unauthorized"},
-        404: {"description": "Cart or menu item not found"},
+        404: {"description": "Cart, menu item, or restaurant not found"},
         409: {"description": "Item unavailable or restaurant mismatch"},
         422: {"description": "Invalid item ID or quantity"},
         500: {"description": "Cart storage is unavailable"},

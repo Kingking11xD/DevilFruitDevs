@@ -319,6 +319,7 @@ def test_add_item_from_missing_restaurant(integration_setup):
         json={"menu_item_id": 4, "quantity": 1},
     )
     assert response.status_code == 404
+    assert response.json()["detail"] == "Restaurant not found"
     assert shopping_path.read_bytes() == shopping_before
 
 
@@ -344,7 +345,7 @@ def test_new_cart_after_checkout(integration_setup):
 
     details = client.get("/customers/me/cart")
     assert details.status_code == 200
-    
+
     checkout = client.post(
         f"/carts/{old_cart_id}/checkout",
         json={"expected_total": details.json()["total"]},
