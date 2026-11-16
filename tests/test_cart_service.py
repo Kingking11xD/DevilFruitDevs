@@ -4,6 +4,7 @@ import pytest
 
 from app.repositories.cart_repo import CartRepo
 from app.repositories.menu_repo import MenuRepo
+from app.repositories.restaurant_repo import RestaurantRepo
 from app.services.cart_service import (
     CartItemNotFoundError,
     CartNotFoundError,
@@ -19,6 +20,22 @@ def cart_service(tmp_path):
     """Create a cart service with temporary shopping and menu data."""
     cart_file = tmp_path / "shopping.json"
     menu_file = tmp_path / "menu_items.json"
+    restaurant_file = tmp_path / "restaurants.json"
+
+    restaurant_file.write_text(json.dumps([
+        {
+            "id": 1,
+            "name": "Burger House",
+            "cuisine": "American",
+            "address": "1 Test Street",
+        },
+        {
+            "id": 2,
+            "name": "Pizza House",
+            "cuisine": "Italian",
+            "address": "2 Test Street",
+        },
+    ]))
 
     cart_file.write_text(json.dumps({
         "carts": [],
@@ -66,9 +83,12 @@ def cart_service(tmp_path):
     menu_repository = MenuRepo()
     menu_repository.file_path = menu_file
 
+    restaurant_repository = RestaurantRepo()
+    restaurant_repository.file_path = restaurant_file
+
     cart_repository.create(customer_id=1)
 
-    return CartService(cart_repository, menu_repository)
+    return CartService(cart_repository, menu_repository, restaurant_repository)
 
 
 def test_add_item_to_empty_cart(cart_service):
