@@ -2,6 +2,7 @@ import pytest
 from pydantic import ValidationError
 
 from app.schemas.cart import Cart, CartItem, CartItemAdd, CartItemUpdate
+from app.schemas.menu import MenuItemCreate, MenuItemUpdate
 
 @pytest.mark.parametrize(
     "data",
@@ -62,3 +63,18 @@ def test_cart_model() -> None:
             status="pending",
             items=[],
         )
+
+
+@pytest.mark.parametrize("value", ["yes", 1, 0, None])
+def test_menu_item_create_invalid_availability(value):
+    """Test that creating menu items rejects invalid availability values."""
+    with pytest.raises(ValidationError):
+        MenuItemCreate(name="Pizza", price=100, available=value)
+
+
+@pytest.mark.parametrize("field", ["available", "active"])
+@pytest.mark.parametrize("value", ["yes", 1, 0, None])
+def test_menu_item_update_invalid_status(field, value):
+    """Test that menu item status updates reject invalid values."""
+    with pytest.raises(ValidationError):
+        MenuItemUpdate(**{field: value})

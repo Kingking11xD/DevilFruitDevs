@@ -17,7 +17,10 @@ Then retry the activation command above.
 python -m uvicorn main:app --reload\
 After running the application open another terminal\
 cd frontend \
+npm install \
 npm run dev
+
+The frontend requires Node.js and npm. Open the URL printed by Vite. See [frontend setup and current features](frontend/README.md).
 
 **API endpoints:**   
 Health check: `http://127.0.0.1:8000/health`  
@@ -31,12 +34,25 @@ API documentation: `http://127.0.0.1:8000/docs`
 | GET | `/restaurants/{restaurant_id}` | View the details of a restaurant by ID |
 | POST | `/restaurants` | Create a new restaurant |
 | PATCH | `/restaurants/{restaurant_id}` | Update an existing restaurant |
+| GET | `/restaurants/{restaurant_id}/menu-items` | Browse a restaurant's menu |
+| GET | `/restaurants/{restaurant_id}/menu-items/{item_id}` | View one menu item |
+| POST | `/restaurants/{restaurant_id}/menu-items` | Add a menu item as an admin or assigned restaurant staff |
+| PATCH | `/restaurants/{restaurant_id}/menu-items/{item_id}` | Update a menu item, including availability and active status |
 | POST | `/customers` | Register a customer account |
 | POST | `/auth/login` | Sign in and receive a session token |
 | GET | `/customers/me` | View your profile |
 | PATCH | `/customers/me` | Update your name |
 | PATCH | `/customers/me/address` | Update your delivery address |
 | POST | `/customers/me/deactivate` | Deactivate your account |
+| POST | `/customers/me/cart` | Create a cart or return your active cart |
+| GET | `/customers/me/cart` | View your active cart and backend-calculated totals |
+| POST | `/customers/me/cart/items` | Add a menu item and quantity |
+| PATCH | `/customers/me/cart/items/{item_id}` | Set an item's quantity |
+| DELETE | `/customers/me/cart/items/{item_id}` | Remove an item |
+| DELETE | `/customers/me/cart/items` | Clear the cart |
+| POST | `/carts/{cart_id}/checkout` | Place an order using the displayed total as `expected_total` |
+| GET | `/orders` | View your order history |
+| GET | `/orders/{order_id}` | View one of your saved orders |
 | GET | `/docs` | View the FastAPI API documentation |
 
 **Registration and sign-in:**
@@ -51,6 +67,12 @@ Send the token with protected requests:
     Authorization: Bearer <token>
 
 Tokens expire after 30 minutes. Restarting the backend clears them, so users must sign in again. Saved accounts remain. Run one backend process.
+
+Cart, checkout and order endpoints require an active customer and only access that customer's data. Set a delivery address before checkout. Missing or invalid authentication returns 401; inactive accounts or disallowed roles return 403. Another customer's cart or order returns 404.
+
+Checkout rechecks current prices and availability. A changed total returns 409 so the customer can review it; retrying a completed checkout returns the existing order with 200 instead of creating a duplicate.
+
+Restaurant and menu browsing is public. Menu changes require an active admin or assigned restaurant staff. [PR #97](https://github.com/Kingking11xD/DevilFruitDevs/pull/97) adds the remaining restaurant write checks: admin-only creation and updates by an admin or assigned staff. These restaurant checks are pending merge into `main`.
 
 For a local demo, activate your Python environment, stop any running backend, and run from the project root:
 
@@ -67,13 +89,13 @@ Later runs keep existing data and passwords. Press Ctrl+C to stop. For custom ac
 For permissions routes can use `Depends(get_current_admin)` or `Depends(get_restaurant_manager)` from `app/api/dependencies.py`. Services can use `require_owner(account, customer_id)` from `app/services/permissions.py`. Map ownership failures to 404. Invalid tokens return 401 and blocked access returns 403. Feature owners still need to connect and test these helpers on their endpoints.
 
 **Data storage:**  
-Restaurants are saved in `data/restaurants.json` and accounts in `data/accounts.json`. The included accounts file starts as an empty JSON list. To change the folder before starting the app:
+Restaurants are saved in `data/restaurants.json`, menus in `data/menu_items.json`, accounts in `data/accounts.json`, and carts and orders together in `data/shopping.json`. The included accounts file starts as an empty JSON list. To change the folder before starting the app:
 
 ```powershell
 $env:DATA_DIR = "C:\path\to\data"
 ```
 
-The selected folder must already contain the required JSON files. For a new accounts file, use `[]`. Do not replace an existing accounts file. Missing or invalid files cause an error instead of resetting saved data.
+The selected folder must already contain the required JSON files. For a new accounts file, use `[]`; an empty shopping file uses `{"carts": [], "orders": []}`. Do not replace existing data. Missing or invalid files cause an error instead of resetting saved data.
 
 **Run tests from project root with the virtual environment active:**\
 python -m pytest -v
@@ -94,7 +116,9 @@ root/
 ├── main.py (FastAPI application)
 ├── data/ (Saved application data)
 │   ├── accounts.json
-│   └── restaurants.json
+│   ├── restaurants.json
+│   ├── menu_items.json
+│   └── shopping.json
 ├── docs/
 │   ├── m1-design.md
 │   ├── m2-design.md
@@ -110,6 +134,7 @@ root/
 │   │   │   └── restaurant.ts
 │   │   ├── App.css
 │   │   ├── App.tsx
+│   │   ├── CustomerApp.tsx
 │   │   ├── index.css
 │   │   ├── main.tsx
 │   │   └── vite-env.d.ts

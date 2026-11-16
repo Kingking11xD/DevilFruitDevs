@@ -1,6 +1,6 @@
 from datetime import datetime
 from typing import Literal
-from pydantic import BaseModel, Field, model_validator
+from pydantic import BaseModel, ConfigDict, Field, model_validator
 
 class OrderItem(BaseModel):
     """features of one menu item at checkout"""
@@ -29,7 +29,7 @@ class Order(BaseModel):
     status: Literal["placed"]
     created_at: datetime
 
-    # TODO: match the delivery address type keenan uses in accounts
+    # DONE: match the delivery address type keenan uses in accounts
     delivery_address: str = Field(min_length=1, max_length=500)
     items: list[OrderItem] = Field(min_length=1)
     subtotal: int = Field(ge=0)
@@ -42,3 +42,7 @@ class Order(BaseModel):
         if self.subtotal != sum(item.line_total for item in self.items):
             raise ValueError("subtotal must equal the sum of item line totals")
         return self
+
+class CheckoutRequest(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+    expected_total: int = Field(strict=True, ge=0)
