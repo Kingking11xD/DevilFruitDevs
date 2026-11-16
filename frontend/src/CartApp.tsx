@@ -13,21 +13,21 @@ export interface CartDetail {
   id: string;
   customer_id: string;
   restaurant_id: number | null;
-  items: Record<string, CartItemDetail> | CartItemDetail[]; // Handling both array or dict formats depending on backend schema
+  items: Record<string, CartItemDetail> | CartItemDetail[]; 
   subtotal: number;
   total: number;
 }
 
 interface CartAppProps {
   token: string | null;
+  onCheckoutSuccess?: () => void;
 }
 
-export default function CartApp({ token }: CartAppProps) {
+export default function CartApp({ token, onCheckoutSuccess }: CartAppProps) {
   const [cart, setCart] = useState<CartDetail | null>(null);
   const [loading, setLoading] = useState(false);
   const [message, setMessage] = useState<{ type: 'error' | 'success', text: string } | null>(null);
 
-  // Quick Add State (For testing until the Menu page is built)
   const [addMenuId, setAddMenuId] = useState('');
   const [addQty, setAddQty] = useState('1');
 
@@ -48,7 +48,6 @@ export default function CartApp({ token }: CartAppProps) {
         const data = await res.json();
         setCart(data);
       } else if (res.status === 404) {
-        // Active cart not found [cite: 25]
         setCart(null);
       } else {
         const errData = await res.json();
@@ -94,7 +93,7 @@ export default function CartApp({ token }: CartAppProps) {
       });
       
       if (res.ok) {
-        fetchCart(); // Refetch to get updated totals [cite: 25]
+        fetchCart(); 
       } else {
         const errData = await res.json();
         setMessage({ type: 'error', text: errData.detail || 'Failed to throw overboard.' });
@@ -104,9 +103,42 @@ export default function CartApp({ token }: CartAppProps) {
     }
   };
 
+  const handleClearCart = async () => {
+    if (!window.confirm('Are you sure you want to empty the entire hold? This will dump all cargo overboard!')) return;
+    try {
+      const res = await fetch('/customers/me/cart/items', {
+        method: 'DELETE',
+        headers: { Authorization: `Bearer ${token}` }
+      });
+      
+      if (res.ok) {
+        setCart(null);
+        setMessage({ type: 'success', text: 'Hold emptied. Ready for new plunder!' });
+      } else {
+        const errData = await res.json();
+        setMessage({ type: 'error', text: errData.detail || 'Failed to empty the hold.' });
+      }
+    } catch (err) {
+      setMessage({ type: 'error', text: 'Network error emptying cart.' });
+    }
+  };
+
   const handleQuickAdd = async (e: FormEvent) => {
     e.preventDefault();
     setMessage(null);
+    
+    if (!cart) {
+        try {
+            await fetch('/customers/me/cart', {
+                method: 'POST',
+                headers: { Authorization: `Bearer ${token}` }
+            });
+        } catch (err) {
+            setMessage({ type: 'error', text: 'Failed to manifest a new cart.' });
+            return;
+        }
+    }
+
     try {
       const res = await fetch('/customers/me/cart/items', {
         method: 'POST',
@@ -122,13 +154,52 @@ export default function CartApp({ token }: CartAppProps) {
       
       if (res.ok) {
         setMessage({ type: 'success', text: 'Booty added to hold!' });
-        fetchCart(); // Refresh cart to show new totals
+        fetchCart();
       } else {
         const errData = await res.json();
         setMessage({ type: 'error', text: errData.detail || 'Failed to add booty.' });
       }
     } catch (err) {
       setMessage({ type: 'error', text: 'Network error adding to cart.' });
+    }
+  };
+
+  const handleCheckout = async () => {
+    if (!cart) return;
+    setMessage(null);
+    try {
+      const res = await fetch(`/carts/${cart.id}/checkout`, {
+        method: 'POST',
+        headers: { 
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${token}` 
+        },
+        body: JSON.stringify({ expected_total: cart.total })
+      });
+      
+      if (res.ok) {
+        setCart(null);
+        if (onCheckoutSuccess) {
+            onCheckoutSuccess();
+        } else {
+            setMessage({ type: 'success', text: 'Order dispatched successfully! The snails are on their way.' });
+        }
+      } else {
+        const errData = await res.json();
+        let errMsg = errData.detail || 'Failed to checkout.';
+        
+        // Handle specific 409 TotalChangedError dictionary object
+        if (typeof errData.detail === 'object' && errData.detail.message) {
+            errMsg = `${errData.detail.message}. New total: $${errData.detail.total.toFixed(2)}`;
+            fetchCart(); // Refresh cart to show the new prices
+        } else if (res.status === 409) {
+            fetchCart(); // Refresh cart for unavailable items
+        }
+        
+        setMessage({ type: 'error', text: errMsg });
+      }
+    } catch (err) {
+      setMessage({ type: 'error', text: 'Network error during checkout.' });
     }
   };
 
@@ -140,7 +211,6 @@ export default function CartApp({ token }: CartAppProps) {
     );
   }
 
-  // Normalize items array (Backend might return a dict or an array)
   const cartItems: CartItemDetail[] = cart?.items 
     ? (Array.isArray(cart.items) ? cart.items : Object.values(cart.items))
     : [];
@@ -163,7 +233,7 @@ export default function CartApp({ token }: CartAppProps) {
         </div>
       )}
 
-      {/* QUICK ADD TOOL (Temporary until Menu UI is built) */}
+      {/* QUICK ADD TOOL */}
       <div style={{ backgroundColor: 'rgba(255,255,255,0.4)', padding: '1rem', borderRadius: '8px', border: '2px dashed #a67b5b', marginBottom: '2rem' }}>
         <h4 style={{ margin: '0 0 1rem 0', color: '#3e2723', textTransform: 'uppercase' }}>🔭 Quick Plunder (Add by ID)</h4>
         <form onSubmit={handleQuickAdd} style={{ display: 'flex', gap: '0.5rem', alignItems: 'center', flexWrap: 'wrap' }}>
@@ -200,14 +270,22 @@ export default function CartApp({ token }: CartAppProps) {
 
       {!loading && cartItems.length > 0 && (
         <div style={{ border: '4px solid #3e2723', backgroundColor: '#fdf6e3', padding: '1.5rem', borderRadius: '8px', boxShadow: '5px 5px 0px rgba(0,0,0,0.3)' }}>
-          <h2 style={{ margin: '0 0 1.5rem 0', color: '#3e2723', borderBottom: '2px dashed #a67b5b', paddingBottom: '0.5rem', textTransform: 'uppercase' }}>
-            📦 Ship's Cargo
-          </h2>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderBottom: '2px dashed #a67b5b', paddingBottom: '0.5rem', marginBottom: '1.5rem' }}>
+            <h2 style={{ margin: 0, color: '#3e2723', textTransform: 'uppercase' }}>
+                📦 Ship's Cargo
+            </h2>
+            <button 
+                onClick={handleClearCart}
+                style={{ backgroundColor: '#fff', color: '#c62828', border: '2px solid #c62828', padding: '0.4rem 0.75rem', borderRadius: '4px', fontWeight: 'bold', cursor: 'pointer', fontSize: '0.9rem' }}
+            >
+                Dump All Cargo 🗑️
+            </button>
+          </div>
           
           <ul style={{ listStyle: 'none', padding: 0, margin: 0 }}>
             {cartItems.map((item) => (
-              <li key={item.menu_item_id} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '1rem 0', borderBottom: '1px solid #eaddcf' }}>
-                <div style={{ flex: 1 }}>
+              <li key={item.menu_item_id} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '1rem 0', borderBottom: '1px solid #eaddcf', flexWrap: 'wrap', gap: '1rem' }}>
+                <div style={{ flex: '1 1 200px' }}>
                   <h4 style={{ margin: '0 0 0.25rem 0', color: '#8b0000', fontSize: '1.2rem' }}>
                     {item.name || `Mysterious Ration #${item.menu_item_id}`}
                   </h4>
@@ -234,16 +312,16 @@ export default function CartApp({ token }: CartAppProps) {
                     >+</button>
                   </div>
                   
-                  <div style={{ fontWeight: 'bold', color: '#3e2723', minWidth: '80px', textAlign: 'right' }}>
+                  <div style={{ fontWeight: 'bold', color: '#3e2723', minWidth: '80px', textAlign: 'right', fontSize: '1.1rem' }}>
                     ${(item.line_total || 0).toFixed(2)}
                   </div>
 
                   <button 
                     onClick={() => handleRemoveItem(item.menu_item_id)}
-                    style={{ backgroundColor: '#c62828', color: '#fff', border: '2px solid #8b0000', borderRadius: '4px', padding: '0.5rem', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center' }}
+                    style={{ backgroundColor: '#c62828', color: '#fff', border: '2px solid #8b0000', borderRadius: '4px', padding: '0.5rem 0.75rem', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '1.1rem' }}
                     title="Throw Overboard"
                   >
-                    🗑️
+                    X
                   </button>
                 </div>
               </li>
@@ -251,15 +329,17 @@ export default function CartApp({ token }: CartAppProps) {
           </ul>
 
           <div style={{ marginTop: '2rem', padding: '1.5rem', backgroundColor: '#eaddcf', border: '2px solid #a67b5b', borderRadius: '6px' }}>
-            <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '0.5rem', color: '#555', fontWeight: 'bold' }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '0.5rem', color: '#555', fontWeight: 'bold', fontSize: '1.1rem' }}>
               <span>Subtotal:</span>
               <span>${(cart?.subtotal || 0).toFixed(2)}</span>
             </div>
-            <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '1.5rem', color: '#8b0000', fontWeight: 'bold', borderTop: '2px dashed #a67b5b', paddingTop: '1rem', marginTop: '0.5rem' }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '1.6rem', color: '#8b0000', fontWeight: 'bold', borderTop: '2px dashed #a67b5b', paddingTop: '1rem', marginTop: '0.5rem' }}>
               <span>Total Booty:</span>
               <span>${(cart?.total || 0).toFixed(2)}</span>
             </div>
-            <button style={{ width: '100%', padding: '1rem', backgroundColor: '#8b0000', color: '#ffd700', border: '3px solid #3e2723', borderRadius: '6px', fontWeight: 'bold', fontSize: '1.2rem', textTransform: 'uppercase', letterSpacing: '2px', cursor: 'pointer', marginTop: '1.5rem', boxShadow: '0 4px 0px #3e2723' }}>
+            <button 
+                onClick={handleCheckout}
+                style={{ width: '100%', padding: '1rem', backgroundColor: '#8b0000', color: '#ffd700', border: '3px solid #3e2723', borderRadius: '6px', fontWeight: 'bold', fontSize: '1.2rem', textTransform: 'uppercase', letterSpacing: '2px', cursor: 'pointer', marginTop: '1.5rem', boxShadow: '0 4px 0px #3e2723' }}>
               Set Sail to Checkout ⚓
             </button>
           </div>

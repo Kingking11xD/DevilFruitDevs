@@ -14,6 +14,18 @@ export default defineConfig({
       '/customers': {
         target: 'http://127.0.0.1:8000',
         changeOrigin: true,
+      },
+      '/restaurants': {
+        target: 'http://127.0.0.1:8000',
+        changeOrigin: true,
+      },
+      '/orders': {
+        target: 'http://127.0.0.1:8000',
+        changeOrigin: true,
+      },
+      '/carts': {
+        target: 'http://127.0.0.1:8000',
+        changeOrigin: true,
       }
     }
   }
