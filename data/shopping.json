@@ -1,40 +1,8 @@
 {
   "carts": [
-    {
-      "id": 1,
-      "customer_id": 1,
-      "restaurant_id": 1,
-      "status": "closed",
-      "items": [
-        {
-          "menu_item_id": 1,
-          "quantity": 1
-        }
-      ]
-    }
+    
   ],
   "orders": [
-    {
-      "id": 1,
-      "customer_id": 1,
-      "customer_name": "luffy",
-      "restaurant_id": 1,
-      "restaurant_name": "Sushi kawa",
-      "source_cart_id": 1,
-      "status": "placed",
-      "created_at": "2026-11-16T06:49:44Z",
-      "delivery_address": "Elbalf",
-      "items": [
-        {
-          "menu_item_id": 1,
-          "name": "Margherita Pizza",
-          "unit_price": 1600,
-          "quantity": 1,
-          "line_total": 1600
-        }
-      ],
-      "subtotal": 1600,
-      "total": 1600
-    }
+    
   ]
 }
