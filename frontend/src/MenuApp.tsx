@@ -4,7 +4,6 @@ export interface MenuItem {
   id: number;
   restaurant_id: number;
   name: string;
-  description: string | null;
   price: number;
   available: boolean;
   active: boolean;
@@ -18,16 +17,49 @@ interface MenuAppProps {
   onBack: () => void;
 }
 
+// Reusing error formatter from CartApp to handle FastAPI validation arrays
+function formatErrorDetail(detail: unknown, fallback: string): string {
+  if (typeof detail === 'string' && detail.trim().length > 0) {
+    return detail;
+  }
+  if (Array.isArray(detail)) {
+    const messages = detail
+      .map((item) => {
+        if (typeof item === 'string') return item;
+        if (item && typeof item === 'object' && 'msg' in item) {
+          const loc = Array.isArray((item as { loc?: unknown[] }).loc)
+            ? (item as { loc: unknown[] }).loc.filter((part) => part !== 'body').join('.')
+            : '';
+          const msg = String((item as { msg: unknown }).msg);
+          return loc ? `${loc}: ${msg}` : msg;
+        }
+        return JSON.stringify(item);
+      })
+      .filter(Boolean);
+    if (messages.length > 0) {
+      return messages.join('; ');
+    }
+  }
+  return fallback;
+}
+
+async function parseErrorMessage(res: Response, fallback: string): Promise<string> {
+  try {
+    const data = await res.json();
+    return formatErrorDetail(data?.detail, fallback);
+  } catch {
+    return fallback;
+  }
+}
+
 export default function MenuApp({ token, restaurantId, isAdmin, onAddToCart, onBack }: MenuAppProps) {
   const [menuItems, setMenuItems] = useState<MenuItem[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  // Form states for adding/editing a menu item
   const [editingId, setEditingId] = useState<number | null>(null);
   const [formData, setFormData] = useState({
     name: '',
-    description: '',
     price: 0,
     available: true,
     active: true
@@ -65,25 +97,36 @@ export default function MenuApp({ token, restaurantId, isAdmin, onAddToCart, onB
         ? `/restaurants/${restaurantId}/menu-items/${editingId}`
         : `/restaurants/${restaurantId}/menu-items`;
         
+      // Ensure we only send the fields the backend expects
+      const payload = editingId 
+        ? { 
+            name: formData.name, 
+            price: formData.price, 
+            available: formData.available, 
+            active: formData.active 
+          }
+        : { 
+            name: formData.name, 
+            price: formData.price, 
+            available: formData.available 
+          };
+          
       const res = await fetch(url, {
         method: editingId ? 'PATCH' : 'POST',
         headers: { 
           'Content-Type': 'application/json',
           Authorization: `Bearer ${token}` 
         },
-        body: JSON.stringify({
-          ...formData,
-          description: formData.description || null
-        })
+        body: JSON.stringify(payload)
       });
       
       if (res.ok) {
         fetchMenu();
         setEditingId(null);
-        setFormData({ name: '', description: '', price: 0, available: true, active: true });
+        setFormData({ name: '', price: 0, available: true, active: true });
       } else {
-        const errData = await res.json();
-        alert(errData.detail || 'Failed to save menu item.');
+        const errMsg = await parseErrorMessage(res, 'Failed to save menu item.');
+        alert(errMsg);
       }
     } catch (err) {
       alert('Network error saving menu item.');
@@ -109,7 +152,7 @@ export default function MenuApp({ token, restaurantId, isAdmin, onAddToCart, onB
         </div>
       )}
 
-      {/* Admin Panel: Add Menu Item */}
+      {/* Admin Panel: Add/Edit Menu Item */}
       {isAdmin && (
         <div style={{ backgroundColor: '#fff8dc', padding: '1.5rem', borderRadius: '8px', border: '3px dashed #8b0000', marginBottom: '2rem' }}>
           <h3 style={{ marginTop: 0, color: '#8b0000' }}>{editingId ? 'Edit Grub' : 'Add New Grub'}</h3>
@@ -120,7 +163,7 @@ export default function MenuApp({ token, restaurantId, isAdmin, onAddToCart, onB
                 value={formData.name} 
                 onChange={e => setFormData({...formData, name: e.target.value})} 
                 required 
-                style={{ padding: '0.75rem', flex: 2, border: '2px solid #8b0000', borderRadius: '4px', fontFamily: 'inherit' }} 
+                style={{ padding: '0.75rem', flex: 2, border: '2px solid #8b0000', borderRadius: '4px', fontFamily: 'inherit', color: '#3e2723' }} 
               />
               <input 
                 type="number" 
@@ -130,33 +173,29 @@ export default function MenuApp({ token, restaurantId, isAdmin, onAddToCart, onB
                 value={formData.price === 0 ? '' : formData.price} 
                 onChange={e => setFormData({...formData, price: parseInt(e.target.value, 10) || 0})} 
                 required 
-                style={{ padding: '0.75rem', flex: 1, border: '2px solid #8b0000', borderRadius: '4px', fontFamily: 'inherit' }} 
+                style={{ padding: '0.75rem', flex: 1, border: '2px solid #8b0000', borderRadius: '4px', fontFamily: 'inherit', color: '#3e2723' }} 
               />
             </div>
-            <textarea 
-              placeholder="Description (Optional)" 
-              value={formData.description} 
-              onChange={e => setFormData({...formData, description: e.target.value})} 
-              style={{ padding: '0.75rem', border: '2px solid #8b0000', borderRadius: '4px', fontFamily: 'inherit', resize: 'vertical' }} 
-            />
+            
             {editingId && (
               <div style={{ display: 'flex', gap: '2rem', margin: '0.5rem 0' }}>
-                <label style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', cursor: 'pointer', fontWeight: 'bold' }}>
+                <label style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', cursor: 'pointer', fontWeight: 'bold', color: '#3e2723' }}>
                   <input type="checkbox" checked={formData.available} onChange={e => setFormData({...formData, available: e.target.checked})} />
                   Available to Order
                 </label>
-                <label style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', cursor: 'pointer', fontWeight: 'bold' }}>
+                <label style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', cursor: 'pointer', fontWeight: 'bold', color: '#3e2723' }}>
                   <input type="checkbox" checked={formData.active} onChange={e => setFormData({...formData, active: e.target.checked})} />
                   Active Item
                 </label>
               </div>
             )}
+            
             <div style={{ display: 'flex', gap: '1rem' }}>
               <button type="submit" style={{ backgroundColor: '#3e2723', color: '#ffd700', padding: '0.75rem 1.5rem', border: '2px solid #8b0000', borderRadius: '4px', fontWeight: 'bold', cursor: 'pointer' }}>
                 {editingId ? 'Save Changes' : 'Add to Menu'}
               </button>
               {editingId && (
-                <button type="button" onClick={() => { setEditingId(null); setFormData({ name: '', description: '', price: 0, available: true, active: true }); }} style={{ padding: '0.75rem 1.5rem', border: '2px solid #ccc', borderRadius: '4px', cursor: 'pointer' }}>
+                <button type="button" onClick={() => { setEditingId(null); setFormData({ name: '', price: 0, available: true, active: true }); }} style={{ padding: '0.75rem 1.5rem', border: '2px solid #ccc', borderRadius: '4px', cursor: 'pointer', fontWeight: 'bold' }}>
                   Cancel
                 </button>
               )}
@@ -165,10 +204,10 @@ export default function MenuApp({ token, restaurantId, isAdmin, onAddToCart, onB
         </div>
       )}
 
-      {loading && <p style={{ textAlign: 'center', fontWeight: 'bold' }}>⏳ Reading the scroll...</p>}
+      {loading && <p style={{ textAlign: 'center', fontWeight: 'bold', color: '#3e2723' }}>⏳ Reading the scroll...</p>}
 
       {!loading && menuItems.length === 0 && (
-        <p style={{ textAlign: 'center', fontStyle: 'italic', fontSize: '1.2rem' }}>This tavern has no grub available.</p>
+        <p style={{ textAlign: 'center', fontStyle: 'italic', fontSize: '1.2rem', color: '#3e2723' }}>This tavern has no grub available.</p>
       )}
 
       {/* Menu List */}
@@ -181,6 +220,8 @@ export default function MenuApp({ token, restaurantId, isAdmin, onAddToCart, onB
               padding: '1.5rem', 
               boxShadow: '4px 4px 0px rgba(62,39,35,0.8)',
               position: 'relative',
+              display: 'flex',
+              flexDirection: 'column',
               opacity: (!item.available || !item.active) && !isAdmin ? 0.6 : 1
             }}>
               
@@ -193,18 +234,17 @@ export default function MenuApp({ token, restaurantId, isAdmin, onAddToCart, onB
               )}
 
               <h3 style={{ margin: '0 0 0.5rem 0', color: '#8b0000', fontSize: '1.4rem' }}>{item.name}</h3>
-              <div style={{ fontSize: '1.2rem', fontWeight: 'bold', color: '#3e2723', marginBottom: '0.75rem' }}>{item.price} Berries</div>
-              {item.description && <p style={{ color: '#555', fontStyle: 'italic', fontSize: '0.95rem', marginBottom: '1.5rem', minHeight: '40px' }}>"{item.description}"</p>}
+              <div style={{ fontSize: '1.2rem', fontWeight: 'bold', color: '#3e2723', marginBottom: '1.5rem' }}>{item.price} Berries</div>
 
               <div style={{ display: 'flex', gap: '0.5rem', marginTop: 'auto' }}>
                 {isAdmin ? (
                   <button 
                     onClick={() => {
                       setEditingId(item.id);
-                      setFormData({ name: item.name, description: item.description || '', price: item.price, available: item.available, active: item.active });
+                      setFormData({ name: item.name, price: item.price, available: item.available, active: item.active });
                       window.scrollTo({ top: 0, behavior: 'smooth' });
                     }}
-                    style={{ flex: 1, padding: '0.5rem', backgroundColor: '#eaddcf', border: '2px solid #3e2723', fontWeight: 'bold', cursor: 'pointer' }}
+                    style={{ flex: 1, padding: '0.5rem', backgroundColor: '#eaddcf', border: '2px solid #3e2723', fontWeight: 'bold', color: '#3e2723', cursor: 'pointer' }}
                   >
                     Edit Grub
                   </button>
