@@ -1,11 +1,27 @@
-from fastapi import APIRouter, HTTPException
+from typing import Annotated, Any
 
-from app.api.dependencies import account_service
-from app.schemas.auth import LoginRequest, TokenResponse
+from fastapi import APIRouter, Depends, HTTPException
+
+from app.api.dependencies import account_service, get_current_account
+from app.schemas.auth import AuthAccount, LoginRequest, TokenResponse
 from app.services.account_service import InactiveAccountError, InvalidCredentialsError
 from app.services.token_service import create_access_token
 
 router = APIRouter()
+
+
+@router.get(
+    "/auth/me",
+    response_model=AuthAccount,
+    summary="Get signed-in account",
+    description="Return the active account with its role and restaurant assignments.",
+    responses={
+        401: {"description": "Authentication required or invalid"},
+        403: {"description": "Account is inactive"},
+        500: {"description": "Authentication is unavailable"}})
+def get_account(
+        account: Annotated[dict[str, Any], Depends(get_current_account)]) -> dict[str, Any]:
+    return account
 
 
 @router.post(

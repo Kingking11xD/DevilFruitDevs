@@ -1,13 +1,11 @@
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
-from typing import Annotated, Any
+from typing import Any
 
 import pytest
-from fastapi import Depends, FastAPI
 from fastapi.testclient import TestClient
 
 from app.api import dependencies
-from app.api.dependencies import get_current_account
 from app.repositories.json_store import update_records
 from app.services import token_service
 from main import app
@@ -32,19 +30,7 @@ def account() -> dict[str, Any]:
     return response.json()
 
 
-@pytest.fixture
-def protected_client() -> TestClient:
-    test_app = FastAPI()
-
-    # this route exists only in tests to check the shared authentication helper
-    @test_app.get("/protected")
-    def protected(account: Annotated[dict[str, Any], Depends(get_current_account)]) -> dict[str, int]:
-        return {"id": account["id"]}
-
-    return TestClient(test_app)
-
-
-def test_sign_in(account: dict[str, Any], protected_client: TestClient) -> None:
+def test_sign_in(account: dict[str, Any]) -> None:
     before = datetime.now(timezone.utc)
     token_service.sessions["expired"] = {
         "account_id": account["id"], "expires_at": before - timedelta(minutes=1)}
@@ -62,10 +48,10 @@ def test_sign_in(account: dict[str, Any], protected_client: TestClient) -> None:
     assert "expired" not in token_service.sessions
     token_service.sessions["expired"] = {
         "account_id": account["id"], "expires_at": before - timedelta(minutes=1)}
-    protected = protected_client.get(
-        "/protected", headers={"Authorization": f"Bearer {result['access_token']}"})
+    protected = client.get(
+        "/auth/me", headers={"Authorization": f"Bearer {result['access_token']}"})
     assert protected.status_code == 200
-    assert protected.json() == {"id": account["id"]}
+    assert protected.json()["id"] == account["id"]
     assert "expired" not in token_service.sessions
 
 
@@ -82,20 +68,20 @@ def test_invalid_sign_in(account: dict[str, Any]) -> None:
     assert "test-pw-jimbob" not in response.text
 
 
-def test_invalid_tokens(account: dict[str, Any], protected_client: TestClient) -> None:
+def test_invalid_tokens(account: dict[str, Any]) -> None:
     token = token_service.create_access_token(account["id"])
     token_service.sessions[token]["expires_at"] = datetime.now(timezone.utc) - timedelta(minutes=1)
 
-    assert protected_client.get("/protected").status_code == 401
+    assert client.get("/auth/me").status_code == 401
     for invalid in ["not-a-token", token + "changed", token]:
-        response = protected_client.get("/protected", headers={"Authorization": f"Bearer {invalid}"})
+        response = client.get("/auth/me", headers={"Authorization": f"Bearer {invalid}"})
         assert response.status_code == 401
         assert response.headers["www-authenticate"] == "Bearer"
     assert token not in token_service.sessions
 
 
 def test_account_changes_block_old_token(
-        account: dict[str, Any], accounts_file: Path, protected_client: TestClient) -> None:
+        account: dict[str, Any], accounts_file: Path) -> None:
     response = client.post("/auth/login", json={
         "email": "JimBOB@email.com", "password": "test-pw-jimbob"})
     headers = {"Authorization": f"Bearer {response.json()['access_token']}"}
@@ -104,7 +90,7 @@ def test_account_changes_block_old_token(
         records[0]["active"] = False
 
     update_records(accounts_file, deactivate)
-    assert protected_client.get("/protected", headers=headers).status_code == 403
+    assert client.get("/auth/me", headers=headers).status_code == 403
     assert client.post("/auth/login", json={
         "email": "JimBOB@email.com", "password": "test-pw-jimbob"}).status_code == 403
 
@@ -112,23 +98,46 @@ def test_account_changes_block_old_token(
         records.clear()
 
     update_records(accounts_file, remove_account)
-    assert protected_client.get("/protected", headers=headers).status_code == 401
+    assert client.get("/auth/me", headers=headers).status_code == 401
 
 
-def test_session_reset_requires_sign_in(account: dict[str, Any], protected_client: TestClient) -> None:
+def test_session_reset_requires_sign_in(account: dict[str, Any]) -> None:
     response = client.post("/auth/login", json={
         "email": "JimBOB@email.com", "password": "test-pw-jimbob"})
     old_token = response.json()["access_token"]
 
     # restarting the backend clears the sessions but keeps the saved accounts
     token_service.sessions.clear()
-    assert protected_client.get(
-        "/protected", headers={"Authorization": f"Bearer {old_token}"}).status_code == 401
+    assert client.get(
+        "/auth/me", headers={"Authorization": f"Bearer {old_token}"}).status_code == 401
 
     response = client.post("/auth/login", json={
         "email": "JimBOB@email.com", "password": "test-pw-jimbob"})
     assert response.status_code == 200
     new_token = response.json()["access_token"]
     assert new_token != old_token
-    assert protected_client.get(
-        "/protected", headers={"Authorization": f"Bearer {new_token}"}).json() == {"id": account["id"]}
+    assert client.get(
+        "/auth/me", headers={"Authorization": f"Bearer {new_token}"}).json()["id"] == account["id"]
+
+
+@pytest.mark.parametrize("role, restaurant_ids", [
+    ("customer", []), ("restaurant_user", [1, 2]), ("admin", [])])
+def test_get_account(
+        account: dict[str, Any], accounts_file: Path,
+        role: str, restaurant_ids: list[int]) -> None:
+    def set_role(records: list[dict]) -> None:
+        records[0]["role"] = role
+        records[0]["managed_restaurant_ids"] = restaurant_ids
+
+    update_records(accounts_file, set_role)
+    before = accounts_file.read_bytes()
+    response = client.post("/auth/login", json={
+        "email": "JimBOB@email.com", "password": "test-pw-jimbob"})
+    assert response.status_code == 200
+    headers = {"Authorization": f"Bearer {response.json()['access_token']}"}
+
+    response = client.get("/auth/me", headers=headers)
+    assert response.status_code == 200
+    assert response.json() == {
+        **account, "role": role, "managed_restaurant_ids": restaurant_ids}
+    assert accounts_file.read_bytes() == before
