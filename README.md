@@ -32,14 +32,15 @@ API documentation: `http://127.0.0.1:8000/docs`
 | GET | `/health` | Check that the API is running |
 | GET | `/restaurants` | View all restaurants with optional name search and cuisine filtering |
 | GET | `/restaurants/{restaurant_id}` | View the details of a restaurant by ID |
-| POST | `/restaurants` | Create a new restaurant |
-| PATCH | `/restaurants/{restaurant_id}` | Update an existing restaurant |
+| POST | `/restaurants` | Create a new restaurant as an admin |
+| PATCH | `/restaurants/{restaurant_id}` | Update a restaurant as an admin or assigned restaurant staff |
 | GET | `/restaurants/{restaurant_id}/menu-items` | Browse a restaurant's menu |
 | GET | `/restaurants/{restaurant_id}/menu-items/{item_id}` | View one menu item |
 | POST | `/restaurants/{restaurant_id}/menu-items` | Add a menu item as an admin or assigned restaurant staff |
 | PATCH | `/restaurants/{restaurant_id}/menu-items/{item_id}` | Update a menu item, including availability and active status |
 | POST | `/customers` | Register a customer account |
 | POST | `/auth/login` | Sign in and receive a session token |
+| GET | `/auth/me` | View your signed-in account, role and restaurant assignments |
 | GET | `/customers/me` | View your profile |
 | PATCH | `/customers/me` | Update your name |
 | PATCH | `/customers/me/address` | Update your delivery address |
@@ -72,7 +73,7 @@ Cart, checkout and order endpoints require an active customer and only access th
 
 Checkout rechecks current prices and availability. A changed total returns 409 so the customer can review it; retrying a completed checkout returns the existing order with 200 instead of creating a duplicate.
 
-Restaurant and menu browsing is public. Menu changes require an active admin or assigned restaurant staff. [PR #97](https://github.com/Kingking11xD/DevilFruitDevs/pull/97) adds the remaining restaurant write checks: admin-only creation and updates by an admin or assigned staff. These restaurant checks are pending merge into `main`.
+Restaurant and menu browsing is public. Restaurant creation requires an active admin. Restaurant updates and menu changes require an active admin or assigned restaurant staff. `GET /auth/me` accepts any active account role and returns the signed-in account and its restaurant assignments without password hashes.
 
 For a local demo, activate your Python environment, stop any running backend, and run from the project root:
 
