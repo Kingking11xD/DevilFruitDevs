@@ -11,6 +11,12 @@ router = APIRouter()
 
 repository = service.repository
 
+CUSTOMER_ERRORS = {
+    401: {"description": "Authentication required or invalid"},
+    403: {"description": "Account is inactive or is not a customer account"},
+    500: {"description": "Authentication or account storage is unavailable"},
+}
+
 
 def account_update_error(error: Exception) -> HTTPException:
     if isinstance(error, InvalidCredentialsError):
@@ -44,13 +50,19 @@ def register_customer(data: AccountCreate) -> Account:
         raise HTTPException(status_code=500, detail="Account could not be saved") from error
 
 
-@router.get("/customers/me", response_model=Account, summary="View my profile")
+@router.get(
+    "/customers/me", response_model=Account, summary="View my profile",
+    description="Return the active signed-in customer's profile. Staff and admins use /auth/me.",
+    responses=CUSTOMER_ERRORS)
 def get_profile(
         account: Annotated[dict[str, Any], Depends(get_current_customer)]) -> Account:
     return Account.model_validate(account)
 
 
-@router.patch("/customers/me", response_model=Account, summary="Update my name")
+@router.patch(
+    "/customers/me", response_model=Account, summary="Update my name",
+    description="Update only the active signed-in customer's name.",
+    responses=CUSTOMER_ERRORS)
 def update_profile(
         data: AccountUpdate,
         account: Annotated[dict[str, Any], Depends(get_current_customer)]) -> Account:
@@ -61,7 +73,10 @@ def update_profile(
         raise account_update_error(error) from error
 
 
-@router.patch("/customers/me/address", response_model=Account, summary="Update my address")
+@router.patch(
+    "/customers/me/address", response_model=Account, summary="Update my address",
+    description="Update the active signed-in customer's delivery address for future orders.",
+    responses=CUSTOMER_ERRORS)
 def update_address(
         data: AddressUpdate,
         account: Annotated[dict[str, Any], Depends(get_current_customer)]) -> Account:
@@ -72,7 +87,10 @@ def update_address(
         raise account_update_error(error) from error
 
 
-@router.post("/customers/me/deactivate", response_model=Account, summary="Deactivate my account")
+@router.post(
+    "/customers/me/deactivate", response_model=Account, summary="Deactivate my account",
+    description="Deactivate the active signed-in customer's account. Existing tokens stop working; saved orders remain.",
+    responses=CUSTOMER_ERRORS)
 def deactivate_account(
         account: Annotated[dict[str, Any], Depends(get_current_customer)]) -> Account:
     try:

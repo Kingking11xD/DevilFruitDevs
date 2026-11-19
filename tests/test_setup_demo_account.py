@@ -1,3 +1,4 @@
+import json
 from pathlib import Path
 from subprocess import CompletedProcess
 
@@ -121,6 +122,9 @@ def test_demo_mode(data_dir: Path, monkeypatch: pytest.MonkeyPatch) -> None:
     vegeta = accounts.get_by_email("vegeta@email.com")
     assert vegeta["role"] == "restaurant_user"
     assert vegeta["managed_restaurant_ids"] == [17]
+    shopping = demo_dir / "shopping.json"
+    assert json.loads(shopping.read_text(encoding="utf-8")) == {"carts": [], "orders": []}
+    shopping.write_text('{"carts": [{"id": 7}], "orders": [{"id": 8}]}', encoding="utf-8")
     before = {path.name: path.read_bytes() for path in demo_dir.iterdir()}
 
     def unexpected_password(prompt: str, *, echo_char: str | None = None) -> str:

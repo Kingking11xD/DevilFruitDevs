@@ -17,10 +17,10 @@ Then retry the activation command above.
 python -m uvicorn main:app --reload\
 After running the application open another terminal\
 cd frontend \
-npm install \
+npm ci \
 npm run dev
 
-The frontend requires Node.js and npm. Open the URL printed by Vite. See [frontend setup and current features](frontend/README.md).
+The frontend requires Node.js and npm. Open `http://localhost:5173`, the frontend origin allowed by the backend. See [frontend setup and current features](frontend/README.md).
 
 **API endpoints:**   
 Health check: `http://127.0.0.1:8000/health`  
@@ -81,13 +81,15 @@ For a local demo, activate your Python environment, stop any running backend, an
 python setup_demo_account.py --demo
 ```
 
-The command prepares data in `.devilfruitdevs-demo` inside your user folder and starts the backend automatically. No `DATA_DIR` setup is needed.
+Use this instead of the normal backend startup command. It prepares data in `.devilfruitdevs-demo` inside your user folder and starts the backend automatically. Missing shopping storage starts with empty carts and orders; existing data is preserved. No `DATA_DIR` setup is needed. Start the frontend in a second terminal using the commands above.
 
 On the first run, choose a 12-128 character password and enter it twice. Password typing shows stars on Python 3.14+ and stays hidden on older versions. Open `http://127.0.0.1:8000/docs` and use `POST /auth/login` with `bulma@email.com` (admin) or `vegeta@email.com` (restaurant user) and that password. Vegeta is assigned to the first restaurant in the demo data.
 
 Later runs keep existing data and passwords. Press Ctrl+C to stop. For custom account options, run `python setup_demo_account.py --help`. Public registration still creates customers only.
 
-For permissions routes can use `Depends(get_current_admin)` or `Depends(get_restaurant_manager)` from `app/api/dependencies.py`. Services can use `require_owner(account, customer_id)` from `app/services/permissions.py`. Map ownership failures to 404. Invalid tokens return 401 and blocked access returns 403. Feature owners still need to connect and test these helpers on their endpoints.
+You can also sign in through the frontend's Captain's Log. Admins and staff can enable Fleet Admiral Mode under Find Grub; available controls follow their role and restaurant assignments. See the [frontend guide](frontend/README.md) for the customer and management flows. Refreshing the frontend requires signing in again.
+
+For permissions routes can use `Depends(get_current_admin)` or `Depends(get_restaurant_manager)` from `app/api/dependencies.py`. Services can use `require_owner(account, customer_id)` from `app/services/permissions.py`. Map ownership failures to 404. Invalid tokens return 401 and blocked access returns 403.
 
 **Data storage:**  
 Restaurants are saved in `data/restaurants.json`, menus in `data/menu_items.json`, accounts in `data/accounts.json`, and carts and orders together in `data/shopping.json`. The included accounts file starts as an empty JSON list. To change the folder before starting the app:
@@ -136,6 +138,9 @@ root/
 │   │   ├── App.css
 │   │   ├── App.tsx
 │   │   ├── CustomerApp.tsx
+│   │   ├── CartApp.tsx
+│   │   ├── MenuApp.tsx
+│   │   ├── OrdersApp.tsx
 │   │   ├── index.css
 │   │   ├── main.tsx
 │   │   └── vite-env.d.ts

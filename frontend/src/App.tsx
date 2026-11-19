@@ -1,7 +1,7 @@
 import { useEffect, useState, FormEvent } from "react";
 import { Restaurant, RestaurantCreate, RestaurantUpdate } from "./types/restaurant";
 import { fetchRestaurants, createRestaurant, updateRestaurant } from "./api/restaurants";
-import CustomerApp from "./CustomerApp";
+import CustomerApp, { Account } from "./CustomerApp";
 import CartApp from "./CartApp";
 import MenuApp from "./MenuApp";
 import OrdersApp from "./OrdersApp";
@@ -19,6 +19,13 @@ export default function App() {
   type TabName = 'restaurants' | 'profile' | 'cart' | 'orders';
   const [activeTab, setActiveTab] = useState<TabName>('restaurants');
   const [token, setToken] = useState<string | null>(null);
+  const [account, setAccount] = useState<Account | null>(null);
+  const isStaff = account?.role === 'admin' || account?.role === 'restaurant_user';
+
+  const canManageRestaurant = (id: number) => Boolean(token && (
+    account?.role === 'admin' ||
+    (account?.role === 'restaurant_user' && account.managed_restaurant_ids.includes(id))
+  ));
   
   const [selectedRestaurantId, setSelectedRestaurantId] = useState<number | null>(null);
 
@@ -30,6 +37,16 @@ export default function App() {
 
   const [editingId, setEditingId] = useState<number | null>(null);
   const [editFormData, setEditFormData] = useState<RestaurantUpdate>({});
+
+  const updateToken = (newToken: string | null) => {
+    setToken(newToken);
+    setAccount(null);
+    setIsAdmin(false);
+    setEditingId(null);
+    setEditFormData({});
+    setNewRestaurant({ name: "", cuisine: "", address: "" });
+    setSelectedRestaurantId(null);
+  };
 
   useEffect(() => {
     let isCurrent = true; 
@@ -51,9 +68,10 @@ export default function App() {
 
   const handleCreate = async (e: FormEvent) => {
     e.preventDefault();
+    if (!token || account?.role !== 'admin') return;
     if (!newRestaurant.name || !newRestaurant.cuisine || !newRestaurant.address) return;
     try {
-      await createRestaurant(newRestaurant);
+      await createRestaurant(newRestaurant, token);
       setNewRestaurant({ name: "", cuisine: "", address: "" });
       setRefresh(prev => prev + 1); 
     } catch (err) {
@@ -62,8 +80,9 @@ export default function App() {
   };
 
   const handleUpdate = async (id: number) => {
+    if (!token || !canManageRestaurant(id)) return;
     try {
-      await updateRestaurant(id, editFormData);
+      await updateRestaurant(id, editFormData, token);
       setEditingId(null);
       setRefresh(prev => prev + 1);
     } catch (err) {
@@ -72,8 +91,8 @@ export default function App() {
   };
 
   const handleAddToCart = async (menuItemId: number, quantity: number) => {
-    if (!token) {
-        alert("You must sign in via the Captain's Log to order!");
+    if (!token || account?.role !== 'customer') {
+        alert("You must sign in as a customer via the Captain's Log to order!");
         return;
     }
     try {
@@ -131,19 +150,20 @@ export default function App() {
 
           <nav style={{ display: 'flex', justifyContent: 'center', flexWrap: 'wrap', gap: '1rem', marginBottom: '2.5rem', borderBottom: '2px solid #a67b5b', paddingBottom: '1.5rem' }}>
             <button onClick={() => { setActiveTab('restaurants'); setSelectedRestaurantId(null); }} style={tabStyle('restaurants')}>🍖 Find Grub</button>
+            {!isStaff && <>
             <button onClick={() => { setActiveTab('cart'); setSelectedRestaurantId(null); }} style={tabStyle('cart')}>🛒 Ship's Cargo</button>
             <button onClick={() => { setActiveTab('orders'); setSelectedRestaurantId(null); }} style={tabStyle('orders')}>📜 Log Book (Orders)</button>
+            </>}
             <button onClick={() => { setActiveTab('profile'); setSelectedRestaurantId(null); }} style={tabStyle('profile')}>⚓ Captain's Log (Auth)</button>
           </nav>
 
-          {activeTab === 'profile' && (
-            <section style={{ backgroundColor: "rgba(255, 255, 255, 0.5)", padding: "1.5rem", borderRadius: "12px", border: "2px solid #a67b5b", marginBottom: "2.5rem" }}>
-               <h2 style={{ color: "#3e2723", borderBottom: "2px solid #a67b5b", paddingBottom: "0.75rem", marginTop: 0, textAlign: 'center' }}>⚓ Captain's Log (Profile)</h2>
-               <CustomerApp token={token} setToken={setToken} />
-            </section>
-          )}
+          {/* keep the profile request running when switching tabs */}
+          <section hidden={activeTab !== 'profile'} style={{ backgroundColor: "rgba(255, 255, 255, 0.5)", padding: "1.5rem", borderRadius: "12px", border: "2px solid #a67b5b", marginBottom: "2.5rem" }}>
+             <h2 style={{ color: "#3e2723", borderBottom: "2px solid #a67b5b", paddingBottom: "0.75rem", marginTop: 0, textAlign: 'center' }}>⚓ Captain's Log (Profile)</h2>
+             <CustomerApp token={token} setToken={updateToken} setAccount={setAccount} />
+          </section>
 
-          {activeTab === 'cart' && (
+          {activeTab === 'cart' && !isStaff && (
             <section style={{ marginBottom: "2.5rem" }}>
                <CartApp 
                   token={token} 
@@ -155,7 +175,7 @@ export default function App() {
             </section>
           )}
           
-          {activeTab === 'orders' && (
+          {activeTab === 'orders' && !isStaff && (
             <section style={{ marginBottom: "2.5rem" }}><OrdersApp token={token} /></section>
           )}
 
@@ -164,7 +184,7 @@ export default function App() {
               <MenuApp 
                 token={token} 
                 restaurantId={selectedRestaurantId} 
-                isAdmin={isAdmin} 
+                isAdmin={isAdmin && canManageRestaurant(selectedRestaurantId)}
                 onAddToCart={handleAddToCart}
                 onBack={() => setSelectedRestaurantId(null)}
               />
@@ -173,16 +193,16 @@ export default function App() {
 
           {activeTab === 'restaurants' && !selectedRestaurantId && (
             <>
-              <div style={{ display: 'flex', justifyContent: 'flex-end', marginBottom: '2rem' }}>
+              {token && isStaff && <div style={{ display: 'flex', justifyContent: 'flex-end', marginBottom: '2rem' }}>
                 <button 
-                  onClick={() => setIsAdmin(!isAdmin)} 
+                  onClick={() => { setIsAdmin(!isAdmin); setEditingId(null); }}
                   style={{ backgroundColor: isAdmin ? '#8b0000' : '#3e2723', color: '#ffd700', padding: '0.75rem 1.25rem', border: '3px solid #ffd700', borderRadius: '6px', cursor: 'pointer', fontWeight: 'bold', fontFamily: "inherit", boxShadow: "3px 3px 0px rgba(0,0,0,0.5)", transition: "all 0.2s" }}
                 >
                   {isAdmin ? '❌ Exit Fleet Admiral Mode' : '🏴‍☠️ Fleet Admiral Mode'}
                 </button>
-              </div>
+              </div>}
 
-              {isAdmin && (
+              {isAdmin && token && account?.role === 'admin' && (
                 <section style={{ border: "3px dashed #8b0000", padding: "1.5rem", backgroundColor: "#fff8dc", marginBottom: "2.5rem", borderRadius: "8px" }}>
                   <h2 style={{ marginTop: 0, color: "#8b0000" }}>🗺️ Chart a New Tavern</h2>
                   <form onSubmit={handleCreate} style={{ display: "flex", gap: "1rem", flexWrap: "wrap" }}>
@@ -227,7 +247,7 @@ export default function App() {
                     <div key={item.id} style={isAdmin ? { borderBottom: "2px solid #a67b5b", padding: "1rem 0", display: "flex", justifyContent: "space-between", alignItems: "center", flexWrap: "wrap", gap: "1rem" } : { backgroundColor: "#fdf6e3", border: "3px solid #3e2723", boxShadow: "6px 6px 0px rgba(62,39,35,0.9)", padding: "1.5rem", display: "flex", flexDirection: "column", alignItems: "center", textAlign: "center", position: "relative" }}>
                       {!isAdmin && <div style={{ position: "absolute", top: "-12px", left: "50%", transform: "translateX(-50%)", width: "24px", height: "24px", backgroundColor: "#8b0000", borderRadius: "50%", border: "3px solid #3e2723", boxShadow: "2px 3px 4px rgba(0,0,0,0.6)" }}></div>}
 
-                      {editingId === item.id ? (
+                      {isAdmin && canManageRestaurant(item.id) && editingId === item.id ? (
                         <div style={{ display: "flex", gap: "1rem", flex: 1, marginRight: "1rem", flexWrap: "wrap", backgroundColor: "rgba(255,255,255,0.9)", padding: "1.2rem", borderRadius: "8px", border: "2px dashed #a67b5b", boxShadow: "inset 0 0 10px rgba(0,0,0,0.05)" }}>
                           <label style={{ display: "flex", flexDirection: "column", flex: 1, color: "#3e2723", fontWeight: "bold", fontSize: "0.95rem" }}>
                             Tavern Name:
@@ -252,7 +272,7 @@ export default function App() {
                           ) : (
                              <>
                                <div style={{ fontSize: "0.9rem", color: "#8b0000", letterSpacing: "3px", fontWeight: "bold", marginBottom: "0.75rem", textShadow: "1px 1px 0px rgba(0,0,0,0.1)" }}>★ BOUNTY ★</div>
-                               <h3 style={{ margin: "0 0 0.75rem 0", color: "#3e2723", fontSize: "1.8rem", textTransform: "uppercase", lineHeight: "1.1", wordWrap: "break-word" }}>{item.name}</h3>
+                               <h3 style={{ margin: "0 0 0.75rem 0", color: "#3e2723", fontSize: "1.6rem", textTransform: "uppercase", lineHeight: "1.1", wordWrap: "break-word" }}>{item.name}</h3>
                                <div style={{ backgroundColor: "#3e2723", color: "#ffd700", padding: "0.3rem 0.75rem", borderRadius: "4px", fontSize: "0.95rem", marginBottom: "1.2rem", display: "inline-block", fontWeight: "bold", border: "1px solid #ffd700" }}>{item.cuisine}</div>
                                <p style={{ margin: "0 0 1.5rem 0", color: "#444", fontSize: "1rem", fontStyle: "italic", borderTop: "1px dashed #a67b5b", paddingTop: "1rem", fontWeight: "500" }}>📍 {item.address}</p>
                              </>
@@ -260,7 +280,7 @@ export default function App() {
                         </div>
                       )}
                       
-                      {isAdmin ? (
+                      {isAdmin && canManageRestaurant(item.id) ? (
                         <div style={{ display: "flex", gap: "1rem", alignItems: "center" }}>
                           <span style={{ color: "#3e2723", fontSize: "1.1rem", fontWeight: "bold" }}>ID: {item.id}</span>
                           {editingId === item.id ? (

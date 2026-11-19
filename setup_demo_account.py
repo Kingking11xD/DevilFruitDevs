@@ -28,12 +28,14 @@ def run_demo() -> int:
     DEMO_DIR.mkdir(parents=True, exist_ok=True)
     print(f"Demo data: {DEMO_DIR}")
 
-    for filename in ["restaurants.json", "menu_items.json", "accounts.json"]:
+    for filename in ["restaurants.json", "menu_items.json", "accounts.json", "shopping.json"]:
         destination = DEMO_DIR / filename
         if destination.exists():
             continue
         if filename == "accounts.json":
             contents = "[]\n"
+        elif filename == "shopping.json":
+            contents = '{"carts": [], "orders": []}\n'
         else:
             contents = (PROJECT_ROOT / "data" / filename).read_text(encoding="utf-8")
         # create missing files only. account changes still go through the repository

@@ -1,16 +1,19 @@
 import { useState, useEffect, FormEvent } from 'react';
 
-interface Account {
-  id: string;
+export interface Account {
+  id: number;
   name: string;
   email: string;
   delivery_address?: string | null;
-  is_active: boolean;
+  active: boolean;
+  role: 'customer' | 'restaurant_user' | 'admin';
+  managed_restaurant_ids: number[];
 }
 
 export interface CustomerAppProps {
   token?: string | null;
   setToken?: (token: string | null) => void;
+  setAccount?: (account: Account | null) => void;
 }
 
 // Module-level fallback so the token survives tab navigation without using localStorage
@@ -57,6 +60,7 @@ export default function CustomerApp(props: CustomerAppProps) {
 
   const token = propToken !== undefined ? propToken : localToken;
   const updateToken = (newToken: string | null) => {
+    updateProfile(null);
     inMemoryToken = newToken;
     if (propSetToken) {
       propSetToken(newToken);
@@ -66,6 +70,10 @@ export default function CustomerApp(props: CustomerAppProps) {
   };
 
   const [profile, setProfile] = useState<Account | null>(null);
+  const updateProfile = (account: Account | null) => {
+    setProfile(account);
+    props.setAccount?.(account);
+  };
   const [view, setView] = useState<'login' | 'register'>('login');
   const [message, setMessage] = useState<{ type: 'error' | 'success'; text: string } | null>(null);
 
@@ -75,29 +83,35 @@ export default function CustomerApp(props: CustomerAppProps) {
   const [deliveryAddress, setDeliveryAddress] = useState('');
 
   useEffect(() => {
+    const controller = new AbortController();
     if (token) {
-      fetchProfile();
+      fetchProfile(controller.signal);
     } else {
-      setProfile(null);
+      updateProfile(null);
     }
+    return () => controller.abort();
   }, [token]);
 
-  const fetchProfile = async () => {
+  const fetchProfile = async (signal: AbortSignal) => {
     try {
-      const res = await fetch('/customers/me', {
+      const res = await fetch('/auth/me', {
+        signal,
         headers: { Authorization: `Bearer ${token}` }
       });
       if (res.ok) {
         const data: Account = await res.json();
-        setProfile(data);
+        if (signal.aborted) return;
+        updateProfile(data);
         setName(data.name);
         setDeliveryAddress(data.delivery_address || '');
       } else {
         const errMsg = await parseErrorMessage(res, 'Session expired. Please sign in again.');
-        updateToken(null);
+        if (signal.aborted) return;
+        if (res.status === 401 || res.status === 403) updateToken(null);
         setMessage({ type: 'error', text: errMsg });
       }
     } catch {
+      if (signal.aborted) return;
       setMessage({ type: 'error', text: 'Network error loading profile. Please check if the server is running.' });
     }
   };
@@ -157,7 +171,7 @@ export default function CustomerApp(props: CustomerAppProps) {
       });
       if (res.ok) {
         const updatedAccount = await res.json();
-        setProfile(updatedAccount);
+        updateProfile({ ...profile, ...updatedAccount });
         setMessage({ type: 'success', text: 'Name updated successfully.' });
       } else {
         const errMsg = await parseErrorMessage(res, 'Failed to update name.');
@@ -179,7 +193,7 @@ export default function CustomerApp(props: CustomerAppProps) {
       });
       if (res.ok) {
         const updatedAccount = await res.json();
-        setProfile(updatedAccount);
+        updateProfile({ ...profile, ...updatedAccount });
         setMessage({ type: 'success', text: 'Address updated successfully.' });
       } else {
         const errMsg = await parseErrorMessage(res, 'Failed to update address.');
@@ -306,6 +320,7 @@ export default function CustomerApp(props: CustomerAppProps) {
             </h1>
           </div>
 
+          {profile.role === 'customer' && <>
           <p style={{ fontSize: '1.3rem', color: '#555', fontWeight: 'bold', marginBottom: '2rem', borderBottom: '2px dashed #a67b5b', paddingBottom: '1.5rem' }}>
             📍 Known Hideout: <br/>
             <span style={{ color: '#8b0000', fontSize: '1.5rem' }}>{profile.delivery_address || 'Unknown Waters'}</span>
@@ -324,11 +339,12 @@ export default function CustomerApp(props: CustomerAppProps) {
               <button type="submit" style={{...btnStyle, width: 'auto', whiteSpace: 'nowrap', padding: '0.85rem 1.5rem'}}>Change Hideout</button>
             </form>
           </div>
+          </>}
         </div>
 
         <div style={{ display: 'flex', gap: '2rem', justifyContent: 'center' }}>
           <button onClick={() => updateToken(null)} style={{...btnStyle, backgroundColor: '#8b0000', color: '#fff', width: 'auto', padding: '0.85rem 2rem'}}>Drop Anchor (Log Out)</button>
-          <button onClick={handleDeactivate} style={{...linkBtnStyle, color: '#c62828'}}>Scuttle Ship (Deactivate)</button>
+          {profile.role === 'customer' && <button onClick={handleDeactivate} style={{...linkBtnStyle, color: '#c62828'}}>Scuttle Ship (Deactivate)</button>}
         </div>
       </div>
     );
