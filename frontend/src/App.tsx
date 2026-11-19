@@ -157,12 +157,11 @@ export default function App() {
             <button onClick={() => { setActiveTab('profile'); setSelectedRestaurantId(null); }} style={tabStyle('profile')}>⚓ Captain's Log (Auth)</button>
           </nav>
 
-          {activeTab === 'profile' && (
-            <section style={{ backgroundColor: "rgba(255, 255, 255, 0.5)", padding: "1.5rem", borderRadius: "12px", border: "2px solid #a67b5b", marginBottom: "2.5rem" }}>
-               <h2 style={{ color: "#3e2723", borderBottom: "2px solid #a67b5b", paddingBottom: "0.75rem", marginTop: 0, textAlign: 'center' }}>⚓ Captain's Log (Profile)</h2>
-               <CustomerApp token={token} setToken={updateToken} setAccount={setAccount} />
-            </section>
-          )}
+          {/* keep the profile request running when switching tabs */}
+          <section hidden={activeTab !== 'profile'} style={{ backgroundColor: "rgba(255, 255, 255, 0.5)", padding: "1.5rem", borderRadius: "12px", border: "2px solid #a67b5b", marginBottom: "2.5rem" }}>
+             <h2 style={{ color: "#3e2723", borderBottom: "2px solid #a67b5b", paddingBottom: "0.75rem", marginTop: 0, textAlign: 'center' }}>⚓ Captain's Log (Profile)</h2>
+             <CustomerApp token={token} setToken={updateToken} setAccount={setAccount} />
+          </section>
 
           {activeTab === 'cart' && !isStaff && (
             <section style={{ marginBottom: "2.5rem" }}>
