@@ -108,14 +108,14 @@ python -m pytest -v
 root/
 ├── .github/
 │   ├── ISSUE_TEMPLATE/
-│   ├── workflows/
+│   └── workflows/
 ├── app/
 │   ├── api/
 │   │   └── routes/ (API endpoints)
 │   ├── services/ (Business rules & application logic)
 │   ├── repositories/ (JSON file access)
 │   │   └── json_store.py (Shared JSON storage)
-│   ├── schemas/ (Pydantic data models)
+│   └── schemas/ (Pydantic data models)
 ├── main.py (FastAPI application)
 ├── data/ (Saved application data)
 │   ├── accounts.json
@@ -137,8 +137,8 @@ root/
 │   │   │   └── restaurant.ts
 │   │   ├── App.css
 │   │   ├── App.tsx
-│   │   ├── CustomerApp.tsx
 │   │   ├── CartApp.tsx
+│   │   ├── CustomerApp.tsx
 │   │   ├── MenuApp.tsx
 │   │   ├── OrdersApp.tsx
 │   │   ├── index.css
@@ -148,12 +148,13 @@ root/
 │   ├── README.md
 │   ├── eslint.config.js
 │   ├── index.html
+│   ├── package-lock.json
 │   ├── package.json
 │   ├── tsconfig.app.json
 │   ├── tsconfig.json
 │   ├── tsconfig.node.json
 │   └── vite.config.ts
-├── tests/ (Automated tests) 
+├── tests/ (Automated tests)
 ├── scrum/ (Team coordination)
 │   └── team-agreement.md
 ├── .gitignore
