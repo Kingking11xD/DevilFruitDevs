@@ -1,7 +1,8 @@
 # COSC 310 Team Agreement
 
-Version: V1  
-Last updated: September 22, 2026
+Version: V2
+
+Last updated: November 19, 2026
 
 ## Part 1 - Team Information
 
@@ -39,8 +40,8 @@ What values guide the team
 ### 4. Response Expectations
 
 - Aim for within 24 hours response  
-- Communicate any issues you are experiencing with the team’  
-- As soon as possible if possible
+- Communicate any issues you are experiencing with the team
+- Flag blockers or delays early, especially near deadlines
 
 ### 5. Respect & Professional Conduct
 
@@ -53,6 +54,11 @@ What values guide the team
 - Each task will have an owner and a deadline  
 - For missed tasks we will check what happened and agree on next steps  
 - AI use is disclosed in PROVENANCE & all AI code is fully understood
+- Keep assigned GitHub issues and project board status updated and share PR links when ready for review
+- Short PRs need one approving teammate, who can merge once checks pass and review concerns are resolved
+- Larger PRs need two approving teammates; the second approving reviewer merges once checks pass and review concerns are resolved
+- Do not approve your own PR
+- Each person helps test how their work connects to the rest of the application
 
 ### 7. Decision-Making
 
