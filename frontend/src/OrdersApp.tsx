@@ -130,7 +130,7 @@ export default function OrdersApp({ token }: OrdersAppProps) {
                           <span style={{ fontWeight: 'bold', color: '#3e2723', marginRight: '0.5rem' }}>{item.quantity}x</span>
                           <span style={{ color: '#8b0000' }}>{item.name}</span>
                         </div>
-                        <div style={{ color: '#555' }}>${(item.line_total || (item.price * item.quantity)).toFixed(2)}</div>
+                        <div style={{ color: '#555' }}>{item.line_total || (item.price * item.quantity)} Berries</div>
                       </li>
                     ))}
                   </ul>
@@ -142,7 +142,7 @@ export default function OrdersApp({ token }: OrdersAppProps) {
                     📍 Delivered to: {order.delivery_address}
                   </div>
                   <div style={{ fontSize: '1.4rem', color: '#8b0000', fontWeight: 'bold' }}>
-                    Total: ${order.total.toFixed(2)}
+                    Total: {order.total} Berries
                   </div>
                 </div>
               </div>

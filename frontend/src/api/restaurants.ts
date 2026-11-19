@@ -32,10 +32,10 @@ export async function fetchRestaurantById(id: number): Promise<Restaurant> {
   return response.json();
 }
 
-export async function createRestaurant(data: RestaurantCreate): Promise<Restaurant> {
+export async function createRestaurant(data: RestaurantCreate, token: string): Promise<Restaurant> {
   const response = await fetch(`${API_BASE_URL}/restaurants`, {
     method: "POST",
-    headers: { "Content-Type": "application/json" },
+    headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
     body: JSON.stringify(data),
   });
 
@@ -57,11 +57,12 @@ export async function createRestaurant(data: RestaurantCreate): Promise<Restaura
 
 export async function updateRestaurant(
   id: number,
-  changes: RestaurantUpdate
+  changes: RestaurantUpdate,
+  token: string
 ): Promise<Restaurant> {
   const response = await fetch(`${API_BASE_URL}/restaurants/${id}`, {
     method: "PATCH",
-    headers: { "Content-Type": "application/json" },
+    headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
     body: JSON.stringify(changes),
   });
 
