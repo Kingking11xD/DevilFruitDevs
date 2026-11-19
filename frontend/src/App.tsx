@@ -272,7 +272,7 @@ export default function App() {
                           ) : (
                              <>
                                <div style={{ fontSize: "0.9rem", color: "#8b0000", letterSpacing: "3px", fontWeight: "bold", marginBottom: "0.75rem", textShadow: "1px 1px 0px rgba(0,0,0,0.1)" }}>★ BOUNTY ★</div>
-                               <h3 style={{ margin: "0 0 0.75rem 0", color: "#3e2723", fontSize: "1.8rem", textTransform: "uppercase", lineHeight: "1.1", wordWrap: "break-word" }}>{item.name}</h3>
+                               <h3 style={{ margin: "0 0 0.75rem 0", color: "#3e2723", fontSize: "1.6rem", textTransform: "uppercase", lineHeight: "1.1", wordWrap: "break-word" }}>{item.name}</h3>
                                <div style={{ backgroundColor: "#3e2723", color: "#ffd700", padding: "0.3rem 0.75rem", borderRadius: "4px", fontSize: "0.95rem", marginBottom: "1.2rem", display: "inline-block", fontWeight: "bold", border: "1px solid #ffd700" }}>{item.cuisine}</div>
                                <p style={{ margin: "0 0 1.5rem 0", color: "#444", fontSize: "1rem", fontStyle: "italic", borderTop: "1px dashed #a67b5b", paddingTop: "1rem", fontWeight: "500" }}>📍 {item.address}</p>
                              </>
