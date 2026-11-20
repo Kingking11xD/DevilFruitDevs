@@ -174,8 +174,30 @@ export default function CartApp({ token, onCheckoutSuccess }: CartAppProps) {
     }
   };
 
+  const handleRemoveItem = async (menuItemId: number) => {
+    if (!window.confirm('Throw these rations overboard?')) return;
+    try {
+      const res = await fetch(`/customers/me/cart/items/${menuItemId}`, {
+        method: 'DELETE',
+        headers: { Authorization: `Bearer ${token}` }
+      });
+
+      if (res.ok) {
+        fetchCart();
+      } else {
+        const errMsg = await parseErrorMessage(res, 'Failed to throw overboard.');
+        setMessage({ type: 'error', text: errMsg });
+      }
+    } catch {
+      setMessage({ type: 'error', text: 'Network error removing item.' });
+    }
+  };
+
   const handleUpdateQuantity = async (menuItemId: number, newQuantity: number) => {
-    if (newQuantity < 1) return;
+    if (newQuantity < 1) {
+      await handleRemoveItem(menuItemId);
+      return;
+    }
     try {
       const res = await fetch(`/customers/me/cart/items/${menuItemId}`, {
         method: 'PATCH',
@@ -195,25 +217,6 @@ export default function CartApp({ token, onCheckoutSuccess }: CartAppProps) {
       }
     } catch {
       setMessage({ type: 'error', text: 'Network error adjusting rations.' });
-    }
-  };
-
-  const handleRemoveItem = async (menuItemId: number) => {
-    if (!window.confirm('Throw these rations overboard?')) return;
-    try {
-      const res = await fetch(`/customers/me/cart/items/${menuItemId}`, {
-        method: 'DELETE',
-        headers: { Authorization: `Bearer ${token}` }
-      });
-
-      if (res.ok) {
-        fetchCart();
-      } else {
-        const errMsg = await parseErrorMessage(res, 'Failed to throw overboard.');
-        setMessage({ type: 'error', text: errMsg });
-      }
-    } catch {
-      setMessage({ type: 'error', text: 'Network error removing item.' });
     }
   };
 
