@@ -335,7 +335,7 @@ export default function CartApp({ token, onCheckoutSuccess }: CartAppProps) {
                 </div>
 
                 <div style={{ display: 'flex', alignItems: 'center', gap: '1rem' }}>
-                  <div style={{ display: 'flex', alignItems: 'center', border: '2px solid #3e2723', borderRadius: '4px', backgroundColor: '#fff', overflow: 'hidden' }}>
+                  <div style={{ display: 'flex', alignItems: 'center', border: '2px solid #3e2723', borderRadius: '4px', backgroundColor: '#d4a931', overflow: 'hidden' }}>
                     <button 
                       onClick={() => handleUpdateQuantity(item.menu_item_id, item.quantity - 1)}
                       style={{ border: 'none', backgroundColor: '#eaddcf', padding: '0.5rem 0.75rem', cursor: 'pointer', fontWeight: 'bold', fontSize: '1.1rem' }}
