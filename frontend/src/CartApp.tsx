@@ -2,7 +2,7 @@ import { useState, useEffect, FormEvent } from 'react';
 
 export interface CartItemDetail {
   menu_item_id: number;
-  name?: string; 
+  name?: string;
   unit_price?: number;
   quantity: number;
   line_total?: number;
@@ -13,9 +13,24 @@ export interface CartDetail {
   id: string;
   customer_id: string;
   restaurant_id: number | null;
-  items: Record<string, CartItemDetail> | CartItemDetail[]; 
+  items: Record<string, CartItemDetail> | CartItemDetail[];
   subtotal: number;
   total: number;
+}
+
+interface RestaurantOption {
+  id: number;
+  name: string;
+  cuisine?: string;
+}
+
+interface MenuItemOption {
+  id: number;
+  restaurant_id: number;
+  name: string;
+  price: number;
+  available: boolean;
+  active: boolean;
 }
 
 interface CartAppProps {
@@ -61,20 +76,84 @@ async function parseErrorMessage(res: Response, fallback: string): Promise<strin
 export default function CartApp({ token, onCheckoutSuccess }: CartAppProps) {
   const [cart, setCart] = useState<CartDetail | null>(null);
   const [loading, setLoading] = useState(false);
-  const [message, setMessage] = useState<{ type: 'error' | 'success', text: string } | null>(null);
+  const [message, setMessage] = useState<{ type: 'error' | 'success'; text: string } | null>(null);
 
+  // Quick Plunder state (supports selecting by restaurant + menu item OR manual ID entry)
+  const [quickMode, setQuickMode] = useState<'picker' | 'manual'>('picker');
+  const [restaurants, setRestaurants] = useState<RestaurantOption[]>([]);
+  const [loadingRestaurants, setLoadingRestaurants] = useState(false);
+  const [selectedRestaurantId, setSelectedRestaurantId] = useState('');
+  const [menuItems, setMenuItems] = useState<MenuItemOption[]>([]);
+  const [loadingMenuItems, setLoadingMenuItems] = useState(false);
+
+  const [manualRestaurantId, setManualRestaurantId] = useState('');
   const [addMenuId, setAddMenuId] = useState('');
   const [addQty, setAddQty] = useState('1');
 
   useEffect(() => {
     if (token) {
       fetchCart();
+      fetchRestaurantsList();
     }
   }, [token]);
 
-  const fetchCart = async () => {
+  // Pre-select the cart's current restaurant if one is active and nothing is chosen yet
+  useEffect(() => {
+    if (cart?.restaurant_id && !selectedRestaurantId) {
+      setSelectedRestaurantId(String(cart.restaurant_id));
+    }
+  }, [cart?.restaurant_id, selectedRestaurantId]);
+
+  // Load menu items whenever a restaurant is selected in picker mode
+  useEffect(() => {
+    if (!token || !selectedRestaurantId) {
+      setMenuItems([]);
+      return;
+    }
+
+    let isCurrent = true;
+    const loadMenu = async () => {
+      setLoadingMenuItems(true);
+      try {
+        const res = await fetch(`/restaurants/${selectedRestaurantId}/menu-items`);
+        if (!isCurrent) return;
+        if (res.ok) {
+          const data: MenuItemOption[] = await res.json();
+          setMenuItems(data);
+        } else {
+          setMenuItems([]);
+        }
+      } catch {
+        if (isCurrent) setMenuItems([]);
+      } finally {
+        if (isCurrent) setLoadingMenuItems(false);
+      }
+    };
+
+    loadMenu();
+    return () => {
+      isCurrent = false;
+    };
+  }, [token, selectedRestaurantId]);
+
+  const fetchRestaurantsList = async () => {
+    setLoadingRestaurants(true);
+    try {
+      const res = await fetch('/restaurants');
+      if (res.ok) {
+        const data: RestaurantOption[] = await res.json();
+        setRestaurants(data);
+      }
+    } catch {
+      // Keep list empty if restaurants fail to load; manual ID mode still works
+    } finally {
+      setLoadingRestaurants(false);
+    }
+  };
+
+  const fetchCart = async (clearMessage = true) => {
     setLoading(true);
-    setMessage(null);
+    if (clearMessage) setMessage(null);
     try {
       const res = await fetch('/customers/me/cart', {
         headers: { Authorization: `Bearer ${token}` }
@@ -88,7 +167,7 @@ export default function CartApp({ token, onCheckoutSuccess }: CartAppProps) {
         const errMsg = await parseErrorMessage(res, 'Failed to load cargo.');
         setMessage({ type: 'error', text: errMsg });
       }
-    } catch (err) {
+    } catch {
       setMessage({ type: 'error', text: 'Network error checking the hold.' });
     } finally {
       setLoading(false);
@@ -100,13 +179,13 @@ export default function CartApp({ token, onCheckoutSuccess }: CartAppProps) {
     try {
       const res = await fetch(`/customers/me/cart/items/${menuItemId}`, {
         method: 'PATCH',
-        headers: { 
+        headers: {
           'Content-Type': 'application/json',
-          Authorization: `Bearer ${token}` 
+          Authorization: `Bearer ${token}`
         },
         body: JSON.stringify({ quantity: newQuantity })
       });
-      
+
       if (res.ok) {
         const data = await res.json();
         setCart(data);
@@ -114,7 +193,7 @@ export default function CartApp({ token, onCheckoutSuccess }: CartAppProps) {
         const errMsg = await parseErrorMessage(res, 'Failed to adjust rations.');
         setMessage({ type: 'error', text: errMsg });
       }
-    } catch (err) {
+    } catch {
       setMessage({ type: 'error', text: 'Network error adjusting rations.' });
     }
   };
@@ -126,14 +205,14 @@ export default function CartApp({ token, onCheckoutSuccess }: CartAppProps) {
         method: 'DELETE',
         headers: { Authorization: `Bearer ${token}` }
       });
-      
+
       if (res.ok) {
-        fetchCart(); 
+        fetchCart();
       } else {
         const errMsg = await parseErrorMessage(res, 'Failed to throw overboard.');
         setMessage({ type: 'error', text: errMsg });
       }
-    } catch (err) {
+    } catch {
       setMessage({ type: 'error', text: 'Network error removing item.' });
     }
   };
@@ -145,7 +224,7 @@ export default function CartApp({ token, onCheckoutSuccess }: CartAppProps) {
         method: 'DELETE',
         headers: { Authorization: `Bearer ${token}` }
       });
-      
+
       if (res.ok) {
         setCart(null);
         setMessage({ type: 'success', text: 'Hold emptied. Ready for new plunder!' });
@@ -153,7 +232,7 @@ export default function CartApp({ token, onCheckoutSuccess }: CartAppProps) {
         const errMsg = await parseErrorMessage(res, 'Failed to empty the hold.');
         setMessage({ type: 'error', text: errMsg });
       }
-    } catch (err) {
+    } catch {
       setMessage({ type: 'error', text: 'Network error emptying cart.' });
     }
   };
@@ -161,40 +240,82 @@ export default function CartApp({ token, onCheckoutSuccess }: CartAppProps) {
   const handleQuickAdd = async (e: FormEvent) => {
     e.preventDefault();
     setMessage(null);
-    
-    if (!cart) {
-        try {
-            await fetch('/customers/me/cart', {
-                method: 'POST',
-                headers: { Authorization: `Bearer ${token}` }
-            });
-        } catch (err) {
-            setMessage({ type: 'error', text: 'Failed to manifest a new cart.' });
-            return;
+
+    const parsedMenuId = parseInt(addMenuId, 10);
+    const parsedQty = parseInt(addQty, 10);
+
+    if (Number.isNaN(parsedMenuId) || parsedMenuId <= 0) {
+      setMessage({ type: 'error', text: 'Please pick or enter a valid Menu Item ID.' });
+      return;
+    }
+
+    if (Number.isNaN(parsedQty) || parsedQty < 1) {
+      setMessage({ type: 'error', text: 'Quantity must be at least 1.' });
+      return;
+    }
+
+    // In manual mode, if a Restaurant ID was provided, verify the item belongs to that restaurant first
+    if (quickMode === 'manual' && manualRestaurantId.trim() !== '') {
+      const parsedRestaurantId = parseInt(manualRestaurantId, 10);
+      if (Number.isNaN(parsedRestaurantId) || parsedRestaurantId <= 0) {
+        setMessage({ type: 'error', text: 'Please enter a valid Restaurant ID.' });
+        return;
+      }
+
+      try {
+        const verifyRes = await fetch(`/restaurants/${parsedRestaurantId}/menu-items/${parsedMenuId}`);
+        if (!verifyRes.ok) {
+          const errMsg = await parseErrorMessage(
+            verifyRes,
+            `Menu item #${parsedMenuId} was not found at Restaurant #${parsedRestaurantId}.`
+          );
+          setMessage({ type: 'error', text: errMsg });
+          return;
         }
+      } catch {
+        setMessage({ type: 'error', text: 'Network error verifying restaurant and menu item.' });
+        return;
+      }
+    }
+
+    if (!cart) {
+      try {
+        const createRes = await fetch('/customers/me/cart', {
+          method: 'POST',
+          headers: { Authorization: `Bearer ${token}` }
+        });
+        if (!createRes.ok) {
+          const errMsg = await parseErrorMessage(createRes, 'Failed to create an active cart.');
+          setMessage({ type: 'error', text: errMsg });
+          return;
+        }
+      } catch {
+        setMessage({ type: 'error', text: 'Failed to manifest a new cart.' });
+        return;
+      }
     }
 
     try {
       const res = await fetch('/customers/me/cart/items', {
         method: 'POST',
-        headers: { 
+        headers: {
           'Content-Type': 'application/json',
-          Authorization: `Bearer ${token}` 
+          Authorization: `Bearer ${token}`
         },
-        body: JSON.stringify({ 
-          menu_item_id: parseInt(addMenuId), 
-          quantity: parseInt(addQty) 
+        body: JSON.stringify({
+          menu_item_id: parsedMenuId,
+          quantity: parsedQty
         })
       });
-      
+
       if (res.ok) {
         setMessage({ type: 'success', text: 'Booty added to hold!' });
-        fetchCart();
+        fetchCart(false);
       } else {
         const errMsg = await parseErrorMessage(res, 'Failed to add booty.');
         setMessage({ type: 'error', text: errMsg });
       }
-    } catch (err) {
+    } catch {
       setMessage({ type: 'error', text: 'Network error adding to cart.' });
     }
   };
@@ -205,35 +326,35 @@ export default function CartApp({ token, onCheckoutSuccess }: CartAppProps) {
     try {
       const res = await fetch(`/carts/${cart.id}/checkout`, {
         method: 'POST',
-        headers: { 
+        headers: {
           'Content-Type': 'application/json',
-          Authorization: `Bearer ${token}` 
+          Authorization: `Bearer ${token}`
         },
         body: JSON.stringify({ expected_total: cart.total })
       });
-      
+
       if (res.ok) {
         setCart(null);
         if (onCheckoutSuccess) {
-            onCheckoutSuccess();
+          onCheckoutSuccess();
         } else {
-            setMessage({ type: 'success', text: 'Order dispatched successfully! The snails are on their way.' });
+          setMessage({ type: 'success', text: 'Order dispatched successfully! The snails are on their way.' });
         }
       } else {
         const errData = await res.json();
         let errMsg = formatErrorDetail(errData.detail, 'Failed to checkout.');
-        
+
         // Handle specific 409 TotalChangedError dictionary object
-        if (typeof errData.detail === 'object' && errData.detail.message) {
-            errMsg = `${errData.detail.message}. New total: ${errData.detail.total} Berries`;
-            fetchCart(); // Refresh cart to show the new prices
+        if (typeof errData.detail === 'object' && errData.detail?.message) {
+          errMsg = `${errData.detail.message}. New total: ${errData.detail.total} Berries`;
+          fetchCart(false); // Refresh cart to show the new prices
         } else if (res.status === 409) {
-            fetchCart(); // Refresh cart for unavailable items
+          fetchCart(false); // Refresh cart for unavailable items
         }
-        
+
         setMessage({ type: 'error', text: errMsg });
       }
-    } catch (err) {
+    } catch {
       setMessage({ type: 'error', text: 'Network error during checkout.' });
     }
   };
@@ -246,55 +367,252 @@ export default function CartApp({ token, onCheckoutSuccess }: CartAppProps) {
     );
   }
 
-  const cartItems: CartItemDetail[] = cart?.items 
-    ? (Array.isArray(cart.items) ? cart.items : Object.values(cart.items))
+  const cartItems: CartItemDetail[] = cart?.items
+    ? Array.isArray(cart.items)
+      ? cart.items
+      : Object.values(cart.items)
     : [];
+
+  const fieldStyle = {
+    padding: '0.6rem 0.75rem',
+    border: '2px solid #8b0000',
+    borderRadius: '4px',
+    backgroundColor: '#ffffff',
+    color: '#3e2723',
+    fontWeight: 600,
+    fontFamily: 'inherit',
+    fontSize: '0.95rem',
+    width: '100%',
+    boxSizing: 'border-box' as const,
+  };
+
+  const labelStyle = {
+    display: 'flex',
+    flexDirection: 'column' as const,
+    gap: '0.35rem',
+    color: '#3e2723',
+    fontWeight: 'bold' as const,
+    fontSize: '0.9rem',
+  };
 
   return (
     <div style={{ maxWidth: '700px', margin: '0 auto' }}>
-      
       {message && (
-        <div style={{ 
-          backgroundColor: message.type === 'error' ? '#ffebee' : '#e8f5e9', 
-          color: message.type === 'error' ? '#c62828' : '#2e7d32', 
-          padding: '1rem', 
-          border: `2px solid ${message.type === 'error' ? '#c62828' : '#2e7d32'}`,
-          borderRadius: '6px',
-          marginBottom: '1.5rem',
-          fontWeight: 'bold',
-          textAlign: 'center'
-        }}>
+        <div
+          style={{
+            backgroundColor: message.type === 'error' ? '#ffebee' : '#e8f5e9',
+            color: message.type === 'error' ? '#c62828' : '#2e7d32',
+            padding: '1rem',
+            border: `2px solid ${message.type === 'error' ? '#c62828' : '#2e7d32'}`,
+            borderRadius: '6px',
+            marginBottom: '1.5rem',
+            fontWeight: 'bold',
+            textAlign: 'center'
+          }}
+        >
           {message.text}
         </div>
       )}
 
-      {/* QUICK ADD TOOL */}
-      <div style={{ backgroundColor: 'rgba(255,255,255,0.4)', padding: '1rem', borderRadius: '8px', border: '2px dashed #a67b5b', marginBottom: '2rem' }}>
-        <h4 style={{ margin: '0 0 1rem 0', color: '#3e2723', textTransform: 'uppercase' }}>🔭 Quick Plunder (Add by ID)</h4>
-        <form onSubmit={handleQuickAdd} style={{ display: 'flex', gap: '0.5rem', alignItems: 'center', flexWrap: 'wrap' }}>
-          <input 
-            type="number" 
-            placeholder="Menu Item ID" 
-            value={addMenuId} 
-            onChange={(e) => setAddMenuId(e.target.value)} 
-            required 
-            style={{ padding: '0.5rem', border: '2px solid #8b0000', borderRadius: '4px', flex: 1, minWidth: '120px' }}
-          />
-          <input 
-            type="number" 
-            min="1" 
-            value={addQty} 
-            onChange={(e) => setAddQty(e.target.value)} 
-            required 
-            style={{ padding: '0.5rem', border: '2px solid #8b0000', borderRadius: '4px', width: '80px' }}
-          />
-          <button type="submit" style={{ backgroundColor: '#3e2723', color: '#ffd700', padding: '0.5rem 1rem', border: '2px solid #8b0000', borderRadius: '4px', fontWeight: 'bold', cursor: 'pointer' }}>
+      {/* QUICK PLUNDER TOOL */}
+      <div
+        style={{
+          backgroundColor: '#fdf6e3',
+          padding: '1.25rem',
+          borderRadius: '8px',
+          border: '3px solid #3e2723',
+          boxShadow: '4px 4px 0px rgba(62,39,35,0.6)',
+          marginBottom: '2rem'
+        }}
+      >
+        <div
+          style={{
+            display: 'flex',
+            justifyContent: 'space-between',
+            alignItems: 'center',
+            flexWrap: 'wrap',
+            gap: '0.75rem',
+            borderBottom: '2px dashed #a67b5b',
+            paddingBottom: '0.75rem',
+            marginBottom: '1rem'
+          }}
+        >
+          <h4 style={{ margin: 0, color: '#8b0000', textTransform: 'uppercase', fontSize: '1.15rem' }}>
+            🔭 Quick Plunder
+          </h4>
+          <div style={{ display: 'flex', gap: '0.5rem' }}>
+            <button
+              type="button"
+              onClick={() => {
+                setQuickMode('picker');
+                setAddMenuId('');
+              }}
+              style={{
+                padding: '0.4rem 0.75rem',
+                borderRadius: '4px',
+                fontWeight: 'bold',
+                fontSize: '0.85rem',
+                cursor: 'pointer',
+                fontFamily: 'inherit',
+                backgroundColor: quickMode === 'picker' ? '#8b0000' : '#eaddcf',
+                color: quickMode === 'picker' ? '#ffd700' : '#3e2723',
+                border: quickMode === 'picker' ? '2px solid #3e2723' : '2px solid #a67b5b'
+              }}
+            >
+              Pick Tavern &amp; Item
+            </button>
+            <button
+              type="button"
+              onClick={() => {
+                setQuickMode('manual');
+                if (selectedRestaurantId && !manualRestaurantId) {
+                  setManualRestaurantId(selectedRestaurantId);
+                }
+              }}
+              style={{
+                padding: '0.4rem 0.75rem',
+                borderRadius: '4px',
+                fontWeight: 'bold',
+                fontSize: '0.85rem',
+                cursor: 'pointer',
+                fontFamily: 'inherit',
+                backgroundColor: quickMode === 'manual' ? '#8b0000' : '#eaddcf',
+                color: quickMode === 'manual' ? '#ffd700' : '#3e2723',
+                border: quickMode === 'manual' ? '2px solid #3e2723' : '2px solid #a67b5b'
+              }}
+            >
+              Enter IDs Manually
+            </button>
+          </div>
+        </div>
+
+        {cart?.restaurant_id && (
+          <p style={{ margin: '0 0 1rem 0', fontSize: '0.9rem', color: '#3e2723', fontWeight: 600 }}>
+            ⚓ Active cargo belongs to <strong>Tavern #{cart.restaurant_id}</strong> (all items in one hold must come from the same tavern).
+          </p>
+        )}
+
+        <form onSubmit={handleQuickAdd} style={{ display: 'flex', gap: '0.75rem', alignItems: 'flex-end', flexWrap: 'wrap' }}>
+          {quickMode === 'picker' ? (
+            <>
+              <label style={{ ...labelStyle, flex: '1 1 200px' }}>
+                Restaurant (ID)
+                <select
+                  value={selectedRestaurantId}
+                  onChange={(e) => {
+                    setSelectedRestaurantId(e.target.value);
+                    setAddMenuId('');
+                  }}
+                  required
+                  style={fieldStyle}
+                >
+                  <option value="">
+                    {loadingRestaurants ? 'Loading taverns...' : '-- Select Restaurant --'}
+                  </option>
+                  {restaurants.map((r) => (
+                    <option key={r.id} value={r.id}>
+                      #{r.id} — {r.name}
+                    </option>
+                  ))}
+                </select>
+              </label>
+
+              <label style={{ ...labelStyle, flex: '1 1 220px' }}>
+                Menu Item (ID)
+                <select
+                  value={addMenuId}
+                  onChange={(e) => setAddMenuId(e.target.value)}
+                  required
+                  disabled={!selectedRestaurantId || loadingMenuItems}
+                  style={{
+                    ...fieldStyle,
+                    backgroundColor: !selectedRestaurantId || loadingMenuItems ? '#eaddcf' : '#ffffff',
+                    cursor: !selectedRestaurantId || loadingMenuItems ? 'not-allowed' : 'pointer'
+                  }}
+                >
+                  <option value="">
+                    {!selectedRestaurantId
+                      ? '-- Pick a Restaurant First --'
+                      : loadingMenuItems
+                        ? 'Loading menu...'
+                        : menuItems.length === 0
+                          ? 'No items on this menu'
+                          : '-- Select Menu Item --'}
+                  </option>
+                  {menuItems.map((item) => {
+                    const unavailable = !item.available || !item.active;
+                    return (
+                      <option key={item.id} value={item.id} disabled={unavailable}>
+                        #{item.id} — {item.name} ({item.price} Berries){unavailable ? ' [Unavailable]' : ''}
+                      </option>
+                    );
+                  })}
+                </select>
+              </label>
+            </>
+          ) : (
+            <>
+              <label style={{ ...labelStyle, flex: '1 1 150px' }}>
+                Restaurant ID
+                <input
+                  type="number"
+                  min="1"
+                  placeholder="Ex: 1"
+                  value={manualRestaurantId}
+                  onChange={(e) => setManualRestaurantId(e.target.value)}
+                  required
+                  style={fieldStyle}
+                />
+              </label>
+
+              <label style={{ ...labelStyle, flex: '1 1 150px' }}>
+                Menu Item ID
+                <input
+                  type="number"
+                  min="1"
+                  placeholder="Ex: 1"
+                  value={addMenuId}
+                  onChange={(e) => setAddMenuId(e.target.value)}
+                  required
+                  style={fieldStyle}
+                />
+              </label>
+            </>
+          )}
+
+          <label style={{ ...labelStyle, width: '90px' }}>
+            Qty
+            <input
+              type="number"
+              min="1"
+              value={addQty}
+              onChange={(e) => setAddQty(e.target.value)}
+              required
+              style={fieldStyle}
+            />
+          </label>
+
+          <button
+            type="submit"
+            style={{
+              backgroundColor: '#3e2723',
+              color: '#ffd700',
+              padding: '0.65rem 1.25rem',
+              border: '2px solid #8b0000',
+              borderRadius: '4px',
+              fontWeight: 'bold',
+              cursor: 'pointer',
+              fontFamily: 'inherit',
+              fontSize: '0.95rem',
+              whiteSpace: 'nowrap'
+            }}
+          >
             Haul Aboard
           </button>
         </form>
       </div>
 
-      {loading && <p style={{ textAlign: 'center', fontWeight: 'bold' }}>⏳ Inspecting the hold...</p>}
+      {loading && <p style={{ textAlign: 'center', fontWeight: 'bold', color: '#3e2723' }}>⏳ Inspecting the hold...</p>}
 
       {!loading && cartItems.length === 0 && (
         <div style={{ textAlign: 'center', padding: '3rem', border: '3px solid #3e2723', backgroundColor: '#fdf6e3', borderRadius: '8px' }}>
@@ -307,16 +625,16 @@ export default function CartApp({ token, onCheckoutSuccess }: CartAppProps) {
         <div style={{ border: '4px solid #3e2723', backgroundColor: '#fdf6e3', padding: '1.5rem', borderRadius: '8px', boxShadow: '5px 5px 0px rgba(0,0,0,0.3)' }}>
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderBottom: '2px dashed #a67b5b', paddingBottom: '0.5rem', marginBottom: '1.5rem' }}>
             <h2 style={{ margin: 0, color: '#3e2723', textTransform: 'uppercase' }}>
-                📦 Ship's Cargo
+              📦 Ship's Cargo
             </h2>
-            <button 
-                onClick={handleClearCart}
-                style={{ backgroundColor: '#fff', color: '#c62828', border: '2px solid #c62828', padding: '0.4rem 0.75rem', borderRadius: '4px', fontWeight: 'bold', cursor: 'pointer', fontSize: '0.9rem' }}
+            <button
+              onClick={handleClearCart}
+              style={{ backgroundColor: '#fff', color: '#c62828', border: '2px solid #c62828', padding: '0.4rem 0.75rem', borderRadius: '4px', fontWeight: 'bold', cursor: 'pointer', fontSize: '0.9rem' }}
             >
-                Dump All Cargo 🗑️
+              Dump All Cargo 🗑️
             </button>
           </div>
-          
+
           <ul style={{ listStyle: 'none', padding: 0, margin: 0 }}>
             {cartItems.map((item) => (
               <li key={item.menu_item_id} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '1rem 0', borderBottom: '1px solid #eaddcf', flexWrap: 'wrap', gap: '1rem' }}>
@@ -336,22 +654,26 @@ export default function CartApp({ token, onCheckoutSuccess }: CartAppProps) {
 
                 <div style={{ display: 'flex', alignItems: 'center', gap: '1rem' }}>
                   <div style={{ display: 'flex', alignItems: 'center', border: '2px solid #3e2723', borderRadius: '4px', backgroundColor: '#d4a931', overflow: 'hidden' }}>
-                    <button 
+                    <button
                       onClick={() => handleUpdateQuantity(item.menu_item_id, item.quantity - 1)}
-                      style={{ border: 'none', backgroundColor: '#eaddcf', padding: '0.5rem 0.75rem', cursor: 'pointer', fontWeight: 'bold', fontSize: '1.1rem' }}
-                    >-</button>
-                    <span style={{ padding: '0 1rem', fontWeight: 'bold' }}>{item.quantity}</span>
-                    <button 
+                      style={{ border: 'none', backgroundColor: '#eaddcf', color: '#3e2723', padding: '0.5rem 0.75rem', cursor: 'pointer', fontWeight: 'bold', fontSize: '1.1rem' }}
+                    >
+                      -
+                    </button>
+                    <span style={{ padding: '0 1rem', fontWeight: 'bold', color: '#3e2723' }}>{item.quantity}</span>
+                    <button
                       onClick={() => handleUpdateQuantity(item.menu_item_id, item.quantity + 1)}
-                      style={{ border: 'none', backgroundColor: '#eaddcf', padding: '0.5rem 0.75rem', cursor: 'pointer', fontWeight: 'bold', fontSize: '1.1rem' }}
-                    >+</button>
+                      style={{ border: 'none', backgroundColor: '#eaddcf', color: '#3e2723', padding: '0.5rem 0.75rem', cursor: 'pointer', fontWeight: 'bold', fontSize: '1.1rem' }}
+                    >
+                      +
+                    </button>
                   </div>
-                  
+
                   <div style={{ fontWeight: 'bold', color: '#3e2723', minWidth: '80px', textAlign: 'right', fontSize: '1.1rem' }}>
                     {item.line_total || 0} Berries
                   </div>
 
-                  <button 
+                  <button
                     onClick={() => handleRemoveItem(item.menu_item_id)}
                     style={{ backgroundColor: '#c62828', color: '#fff', border: '2px solid #8b0000', borderRadius: '4px', padding: '0.5rem 0.75rem', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '1.1rem' }}
                     title="Throw Overboard"
@@ -372,9 +694,10 @@ export default function CartApp({ token, onCheckoutSuccess }: CartAppProps) {
               <span>Total Booty:</span>
               <span>{cart?.total || 0} Berries</span>
             </div>
-            <button 
-                onClick={handleCheckout}
-                style={{ width: '100%', padding: '1rem', backgroundColor: '#8b0000', color: '#ffd700', border: '3px solid #3e2723', borderRadius: '6px', fontWeight: 'bold', fontSize: '1.2rem', textTransform: 'uppercase', letterSpacing: '2px', cursor: 'pointer', marginTop: '1.5rem', boxShadow: '0 4px 0px #3e2723' }}>
+            <button
+              onClick={handleCheckout}
+              style={{ width: '100%', padding: '1rem', backgroundColor: '#8b0000', color: '#ffd700', border: '3px solid #3e2723', borderRadius: '6px', fontWeight: 'bold', fontSize: '1.2rem', textTransform: 'uppercase', letterSpacing: '2px', cursor: 'pointer', marginTop: '1.5rem', boxShadow: '0 4px 0px #3e2723' }}
+            >
               Set Sail to Checkout ⚓
             </button>
           </div>
