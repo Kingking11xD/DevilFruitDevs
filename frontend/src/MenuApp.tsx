@@ -139,7 +139,7 @@ export default function MenuApp({ token, restaurantId, isAdmin, onAddToCart, onB
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.5rem' }}>
         <button 
           onClick={onBack}
-          style={{ backgroundColor: '#eaddcf', border: '2px solid #a67b5b', padding: '0.5rem 1rem', borderRadius: '4px', cursor: 'pointer', fontWeight: 'bold', fontFamily: 'inherit' }}
+          style={{ backgroundColor: '#eaddcf', color: '#3e2723', border: '2px solid #a67b5b', padding: '0.5rem 1rem', borderRadius: '4px', cursor: 'pointer', fontWeight: 'bold', fontFamily: 'inherit' }}
         >
           ⬅ Back to Sea
         </button>
@@ -163,7 +163,7 @@ export default function MenuApp({ token, restaurantId, isAdmin, onAddToCart, onB
                 value={formData.name} 
                 onChange={e => setFormData({...formData, name: e.target.value})} 
                 required 
-                style={{ padding: '0.75rem', flex: 2, border: '2px solid #8b0000', borderRadius: '4px', fontFamily: 'inherit', color: '#3e2723' }} 
+                style={{ padding: '0.75rem', flex: 2, border: '2px solid #8b0000', borderRadius: '4px', fontFamily: 'inherit', backgroundColor: '#ffffff', color: '#3e2723' }} 
               />
               <input 
                 type="number" 
@@ -173,7 +173,7 @@ export default function MenuApp({ token, restaurantId, isAdmin, onAddToCart, onB
                 value={formData.price === 0 ? '' : formData.price} 
                 onChange={e => setFormData({...formData, price: parseInt(e.target.value, 10) || 0})} 
                 required 
-                style={{ padding: '0.75rem', flex: 1, border: '2px solid #8b0000', borderRadius: '4px', fontFamily: 'inherit', color: '#3e2723' }} 
+                style={{ padding: '0.75rem', flex: 1, border: '2px solid #8b0000', borderRadius: '4px', fontFamily: 'inherit', backgroundColor: '#ffffff', color: '#3e2723' }} 
               />
             </div>
             
@@ -195,7 +195,7 @@ export default function MenuApp({ token, restaurantId, isAdmin, onAddToCart, onB
                 {editingId ? 'Save Changes' : 'Add to Menu'}
               </button>
               {editingId && (
-                <button type="button" onClick={() => { setEditingId(null); setFormData({ name: '', price: 0, available: true, active: true }); }} style={{ padding: '0.75rem 1.5rem', border: '2px solid #ccc', borderRadius: '4px', cursor: 'pointer', fontWeight: 'bold' }}>
+                <button type="button" onClick={() => { setEditingId(null); setFormData({ name: '', price: 0, available: true, active: true }); }} style={{ backgroundColor: '#eaddcf', color: '#3e2723', padding: '0.75rem 1.5rem', border: '2px solid #a67b5b', borderRadius: '4px', cursor: 'pointer', fontWeight: 'bold' }}>
                   Cancel
                 </button>
               )}
